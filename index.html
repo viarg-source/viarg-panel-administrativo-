@@ -1501,7 +1501,7 @@ body.sb-collapsed .sidebar:not(:hover) .sidebar-footer-btns { flex-direction: co
     <div style="font-size:11px; color:rgba(255,255,255,0.4);">Sesión iniciada</div>
     <div id="sidebar-user-name" style="font-size:12px; color:rgba(255,255,255,0.75); font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
   </div>
-  <div class="sidebar-footer"><div class="sync-bar"><div class="sync-dot" id="sync-dot"></div><span id="sync-text">Conectando...</span></div><div class="sidebar-footer-btns"><button class="sound-toggle" id="btn-view-toggle" onclick="cycleViewMode()" title="Cambiar vista de prueba" style="display:none;font-size:15px;padding:3px 6px;background:none;border:none">⇄</button><button class="sound-toggle" id="sound-toggle" onclick="toggleSound()" title="Sonido">&#128263;</button><button class="dark-toggle" id="dark-toggle" onclick="toggleDarkMode()" title="Modo oscuro">&#9790;</button><button class="sound-toggle" onclick="authSignOut()" title="Cerrar sesión">&#9167;</button></div></div>
+  <div class="sidebar-footer"><div class="sync-bar"><div class="sync-dot" id="sync-dot"></div><span id="sync-text">Conectando...</span></div><div class="sidebar-footer-btns"><button class="sound-toggle" id="btn-view-toggle" onclick="togglePreviewPopover()" title="Vista de prueba" style="display:none;font-size:15px;padding:3px 6px;background:none;border:none">⇄</button><button class="sound-toggle" id="sound-toggle" onclick="toggleSound()" title="Sonido">&#128263;</button><button class="dark-toggle" id="dark-toggle" onclick="toggleDarkMode()" title="Modo oscuro">&#9790;</button><button class="sound-toggle" onclick="authSignOut()" title="Cerrar sesión">&#9167;</button></div></div>
 </div>
 
 <div class="main">
@@ -2332,6 +2332,29 @@ body.sb-collapsed .sidebar:not(:hover) .sidebar-footer-btns { flex-direction: co
   </div>
 </div>
 <div class="toast" id="toast"></div>
+
+<!-- PREVIEW POPOVER -->
+<div id="preview-popover" style="display:none;position:fixed;bottom:56px;left:10px;z-index:10000;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;box-shadow:0 8px 32px rgba(0,0,0,0.2);width:234px;font-family:'Outfit',sans-serif">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <span style="font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px">Vista de prueba</span>
+    <button onclick="document.getElementById('preview-popover').style.display='none'" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:18px;line-height:1;padding:0;display:flex;align-items:center">×</button>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <button id="pv-opt-admin" onclick="previewSetAdmin()" style="display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;cursor:pointer;font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;color:var(--text);text-align:left;width:100%;transition:background .15s">🛡️ Administrador</button>
+    <div>
+      <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px">💼 Como vendedor</div>
+      <select id="pv-sel-vendedor" class="cal-select" onchange="previewSetVendedor(this.value)" style="width:100%">
+        <option value="">— Seleccioná uno —</option>
+      </select>
+    </div>
+    <div>
+      <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px">🗺️ Como guía</div>
+      <select id="pv-sel-guia" class="cal-select" onchange="previewSetGuia(this.value)" style="width:100%">
+        <option value="">— Seleccioná una —</option>
+      </select>
+    </div>
+  </div>
+</div>
 <div class="modal-overlay" id="modal-overlay" onclick="cerrarModal(event)"><div class="modal"><div class="modal-handle"></div><div class="modal-title">Editar servicio</div><div class="form-grid"><div><label>Fecha</label><input type="date" id="edit-fecha"></div><div><label>Cantidad</label><input type="number" id="edit-cant" placeholder="1" min="1"></div><div class="full"><label>Descripción</label><input type="text" id="edit-desc"></div><div class="full"><label>Nota (opcional)</label><input type="text" id="edit-nota"></div><div><label>Pago de Tour</label><div class="field-currency"><input type="number" id="edit-precio" placeholder="0"><select class="currency-select" id="edit-pdiv"><option value="USD">USD</option><option value="ARS">ARS</option></select></div></div><div><label>Cobro VIARG</label><div class="field-currency"><input type="number" id="edit-cobro" placeholder="0"><select class="currency-select" id="edit-cdiv"><option value="USD">USD</option><option value="ARS">ARS</option></select></div></div><div><label>Comisión</label><div class="field-currency"><input type="number" id="edit-com" placeholder="0"><select class="currency-select" id="edit-comdiv"><option value="USD">USD</option><option value="ARS">ARS</option></select></div></div><div><label>Gasto</label><div class="field-currency"><input type="number" id="edit-gasto" placeholder="0"><select class="currency-select" id="edit-gdiv"><option value="ARS">ARS</option><option value="USD">USD</option></select></div></div></div><div class="modal-actions"><button class="btn-cancel" onclick="cerrarModal()">Cancelar</button><button class="btn btn-teal btn-full" style="margin-top:0" onclick="guardarEdicion()">Guardar cambios</button></div></div></div>
 
 <!-- XLSX IMPORT MODAL -->
@@ -6617,54 +6640,99 @@ function updateNavVisibility(){
     const sec=el.getAttribute('data-section');
     el.style.display=currentUser.sections.includes(sec)?'':'none';
   });
-  // Show view-toggle for all admins (real role)
+  // Show view-toggle for admins (real role or currently in preview)
   const btn=document.getElementById('btn-view-toggle');
   if(btn){
     const isRealAdmin = _previewMode > 0 ? true : currentUser.role==='admin';
     if(isRealAdmin){
       btn.style.display='';
-      const labels = ['🛡️','💼','🗺️'];
-      const titles = ['Vista Admin · clic → Ventas','Vista Ventas · clic → Guía','Vista Guía · clic → Admin'];
-      const colors = ['var(--teal)','rgba(255,255,255,0.55)','#a78bfa'];
-      btn.textContent = labels[_previewMode];
-      btn.title = titles[_previewMode];
-      btn.style.color = colors[_previewMode];
-      btn.style.fontSize = '16px';
+      btn.style.fontSize='16px';
+      if(_previewMode===0){
+        btn.textContent='⇄'; btn.title='Vista de prueba'; btn.style.color='var(--teal)';
+      } else if(_previewMode===1){
+        const vd=(state.ventas?.vendedores||[]).find(v=>v.id===_previewVendedorId);
+        btn.textContent='💼'; btn.title='Vista vendedor: '+(vd?.nombre||'?')+' · clic para cambiar'; btn.style.color='rgba(255,200,0,0.9)';
+      } else {
+        btn.textContent='🗺️'; btn.title='Vista guía: '+(_previewGuiaNombre||'?')+' · clic para cambiar'; btn.style.color='#a78bfa';
+      }
     } else {
       btn.style.display='none';
     }
   }
 }
 
-let _previewMode = 0; // 0=admin real, 1=ventas, 2=guía
+let _previewMode = 0; // 0=admin real, 1=vendedor, 2=guía
 let _savedUser = null;
-function cycleViewMode(){
-  if(!currentUser) return;
-  if(_previewMode===0){
-    if(currentUser.role!=='admin') return;
-    _savedUser={role:currentUser.role, sections:[...currentUser.sections]};
+let _previewVendedorId = null;
+let _previewGuiaNombre  = null;
+
+function togglePreviewPopover(){
+  const pop=document.getElementById('preview-popover');
+  if(!pop) return;
+  if(pop.style.display!=='none'){ pop.style.display='none'; return; }
+  // Populate vendedores
+  const selV=document.getElementById('pv-sel-vendedor');
+  if(selV){
+    const vds=(state.ventas?.vendedores||[]).sort((a,b)=>a.nombre.localeCompare(b.nombre));
+    selV.innerHTML='<option value="">— Seleccioná uno —</option>'+vds.map(vd=>`<option value="${vd.id}"${_previewVendedorId===vd.id?' selected':''}>${vd.nombre}</option>`).join('');
   }
-  _previewMode=(_previewMode+1)%3;
-  if(_previewMode===0){
-    // Volver a admin real
+  // Populate guías
+  const selG=document.getElementById('pv-sel-guia');
+  if(selG){
+    const gs=(state.guias||[]).sort((a,b)=>a.nombre.localeCompare(b.nombre));
+    selG.innerHTML='<option value="">— Seleccioná una —</option>'+gs.map(g=>`<option value="${g.nombre}"${_previewGuiaNombre===g.nombre?' selected':''}>${g.nombre}</option>`).join('');
+  }
+  // Highlight active option
+  const adminBtn=document.getElementById('pv-opt-admin');
+  if(adminBtn) adminBtn.style.background=_previewMode===0?'rgba(43,188,204,0.12)':'';
+  pop.style.display='';
+}
+
+function previewSetAdmin(){
+  if(_savedUser){
     currentUser.role=_savedUser.role;
     currentUser.sections=_savedUser.sections;
-  } else if(_previewMode===1){
-    // Simular vendedor
-    currentUser.role='usuario';
-    currentUser.sections=DEFAULT_SECTIONS;
-  } else {
-    // Simular guía
-    currentUser.role='guia';
-    currentUser.sections=GUIA_SECTIONS;
+    const uid=currentUser.uid;
+    if(uid&&usersCache[uid]){
+      usersCache[uid].vendedorId=_savedUser.vendedorId;
+      usersCache[uid].guiaNombre=_savedUser.guiaNombre;
+    }
+    _savedUser=null;
   }
+  _previewMode=0; _previewVendedorId=null; _previewGuiaNombre=null;
+  document.getElementById('preview-popover').style.display='none';
   updateNavVisibility();
-  const active=document.querySelector('.nav-item.active');
-  const sec=active?.getAttribute('data-section')||'dashboard';
-  if(!currentUser.sections.includes(sec)) switchSection('dashboard');
-  else switchSection(sec);
-  const toasts=['🛡️ Vista Administrador','💼 Vista Ventas','🗺️ Vista Guía'];
-  mostrarToast(toasts[_previewMode]);
+  switchSection('dashboard');
+  mostrarToast('🛡️ Vista Administrador');
+}
+
+function previewSetVendedor(id){
+  if(!id) return;
+  const uid=currentUser.uid;
+  if(!_savedUser) _savedUser={role:currentUser.role,sections:[...currentUser.sections],vendedorId:usersCache[uid]?.vendedorId,guiaNombre:usersCache[uid]?.guiaNombre};
+  _previewMode=1; _previewVendedorId=id; _previewGuiaNombre=null;
+  currentUser.role='usuario';
+  currentUser.sections=DEFAULT_SECTIONS;
+  if(uid&&usersCache[uid]){ usersCache[uid].vendedorId=id; usersCache[uid].guiaNombre=null; }
+  document.getElementById('preview-popover').style.display='none';
+  updateNavVisibility();
+  switchSection(currentUser.sections.includes('ventas')?'ventas':'dashboard');
+  const vd=(state.ventas?.vendedores||[]).find(v=>v.id==id);
+  mostrarToast(`💼 Vista vendedor: ${vd?.nombre||id}`);
+}
+
+function previewSetGuia(nombre){
+  if(!nombre) return;
+  const uid=currentUser.uid;
+  if(!_savedUser) _savedUser={role:currentUser.role,sections:[...currentUser.sections],vendedorId:usersCache[uid]?.vendedorId,guiaNombre:usersCache[uid]?.guiaNombre};
+  _previewMode=2; _previewVendedorId=null; _previewGuiaNombre=nombre;
+  currentUser.role='guia';
+  currentUser.sections=GUIA_SECTIONS;
+  if(uid&&usersCache[uid]){ usersCache[uid].guiaNombre=nombre; usersCache[uid].vendedorId=null; }
+  document.getElementById('preview-popover').style.display='none';
+  updateNavVisibility();
+  switchSection(currentUser.sections.includes('guias')?'guias':'dashboard');
+  mostrarToast(`🗺️ Vista guía: ${nombre}`);
 }
 let _lastSaveTs = 0;
 let _stateFromFirebase = false;   // true solo cuando el estado viene de Firebase (no localStorage fallback)
