@@ -1494,7 +1494,7 @@ body.sb-collapsed .sidebar:not(:hover) .sidebar-footer-btns { flex-direction: co
   <button class="nav-item" data-section="finanzas" onclick="switchSection('finanzas')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg><span class="nav-label">Finanzas</span></button>
   <button class="nav-item" data-section="reportes" onclick="switchSection('reportes')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg><span class="nav-label">Reportes</span></button>
   <button class="nav-item" data-section="ventas" onclick="switchSection('ventas')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 7H4l1-7z"/></svg><span class="nav-label">Ventas</span></button>
-  <button class="nav-item" data-section="cotizador" onclick="switchSection('cotizador')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 13h.01M13 13h.01M17 13h.01M17 17h.01M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"/></svg><span class="nav-label">Cotizador</span></button>
+  <button class="nav-item" data-section="cotizador" onclick="switchSection('cotizador')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 13h.01M13 13h.01M17 13h.01M17 17h.01M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"/></svg><span class="nav-label">Cotizador</span><span style="font-size:9px;font-weight:800;background:var(--teal);color:#060F1E;border-radius:4px;padding:1px 5px;letter-spacing:.5px;line-height:1.4;flex-shrink:0">BETA</span></button>
   <button class="nav-item" data-section="h1" onclick="switchSection('h1')"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M5 17H3a1 1 0 01-1-1v-4l2.5-6h13l2.5 6v4a1 1 0 01-1 1h-2"/><circle cx="7.5" cy="17" r="2"/><circle cx="16.5" cy="17" r="2"/><path d="M7.5 17h9"/></svg><span class="nav-label">Vehículos</span></button>
   <button class="nav-item" data-section="config" onclick="switchSection('config')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg><span class="nav-label">Configuración</span></button>
   <div id="sidebar-user" style="display:none; padding:10px 16px 4px; border-top:1px solid rgba(255,255,255,0.06);">
@@ -2168,7 +2168,7 @@ body.sb-collapsed .sidebar:not(:hover) .sidebar-footer-btns { flex-direction: co
 
       <!-- Header -->
       <div class="cotiz-header">
-        <span class="cotiz-title">Cotizador de paquetes</span>
+        <span class="cotiz-title">Cotizador de paquetes</span><span style="font-size:10px;font-weight:800;background:var(--teal);color:#060F1E;border-radius:4px;padding:2px 7px;letter-spacing:.5px;margin-left:8px;vertical-align:middle">BETA</span>
         <div class="cotiz-dolar-badge">
           <span>USD Blue</span>
           <span class="cotiz-dolar-val" id="cotiz-dolar-val">—</span>
@@ -2592,10 +2592,10 @@ function switchSection(n){
     'ventas':        ['Ventas',          'Comisiones y ranking de vendedores'],
     'h1':            ['Vehículos',       'Tours H1 en tiempo real desde Airtable'],
     'partidos':      ['Partidos',        'River y Boca de local — planificación de tours de estadio'],
-    'cotizador':     ['Cotizador',       'Armá presupuestos en dólares blue al instante']
+    'cotizador':     ['Cotizador <span style="font-size:10px;font-weight:800;background:var(--teal);color:#060F1E;border-radius:4px;padding:1px 6px;letter-spacing:.5px;vertical-align:middle;margin-left:6px">BETA</span>', 'Armá presupuestos en dólares blue al instante']
   };
   const t = titles[n] || ['VIARG','Panel administrativo'];
-  document.getElementById('topbar-title').textContent = t[0];
+  document.getElementById('topbar-title').innerHTML = t[0];
   document.getElementById('topbar-sub').textContent = t[1];
   // Topbar actions
   const ta = document.getElementById('topbar-actions');
@@ -5215,7 +5215,6 @@ async function cargarDatos(){
   }catch(e){
     cargarLocal();
     finMergeFromState();
-    // Marcar que el estado viene de localStorage — guardar() se protegerá antes de escribir a Firebase
     _stateFromFirebase = false;
     setSyncStatus('error', e.message==='timeout' ? 'Timeout · Datos locales' : 'Sin conexión');
   }
@@ -5229,27 +5228,13 @@ async function guardar(){
   clearTimeout(saveTimeout);
   saveTimeout=setTimeout(async()=>{
     if(!window._dbSet) return;
-    // Protección: si el estado viene de localStorage (Firebase no respondió al arrancar),
-    // intentar obtener datos frescos antes de guardar para no sobreescribir con datos viejos
-    if(!_stateFromFirebase){
-      try{
-        const fresh = await Promise.race([window._dbGet(), new Promise((_,r)=>setTimeout(()=>r(null),5000))]);
-        if(fresh){
-          // Firebase respondió — marcar como sincronizado y continuar con el save normal
-          _stateFromFirebase = true;
-        } else {
-          // Firebase sigue sin responder — avisar y no guardar para no corromper datos
-          setSyncStatus('error','Sin conexión · No se guardó en servidor');
-          mostrarToast('Sin conexión al servidor. Reconectá para sincronizar.','error');
-          return;
-        }
-      }catch(e){
-        setSyncStatus('error','Sin conexión · No se guardó en servidor');
-        return;
-      }
+    try{
+      await window._dbSet(JSON.parse(JSON.stringify(state)));
+      _stateFromFirebase = true; // write exitoso → ya estamos conectados
+      setSyncStatus('synced','Sincronizado');
+    }catch(e){
+      setSyncStatus('error','Error al guardar · Solo local');
     }
-    try{await window._dbSet(JSON.parse(JSON.stringify(state)));setSyncStatus('synced','Sincronizado');}
-    catch(e){setSyncStatus('error','Error al guardar');}
   },800);
 }
 
@@ -7676,7 +7661,7 @@ function renderUsersPanel(){
       }).join('')}
     </div>` : '';
     // GuiaNombre input — for guia role, OR for admin's own row (test preview)
-    const showGuiaInput = isGuia || (isSelf && isAdmin);
+    const showGuiaInput = isGuia;
     const guiaInput = showGuiaInput ? `<div style="padding:8px 0;border-top:1px solid var(--border-light);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <span style="font-size:11px;color:var(--text3);font-weight:600">${isSelf?'🗺️ Nombre guía (para probar vista):':'Nombre en Airtable (GUIA/CHOFER):'}</span>
       <input type="text" value="${u.guiaNombre||''}" placeholder="Ej: Juan García"
