@@ -216,20 +216,22 @@ function tfSelectServicio(id) {
 
 function tfRenderVehiculoTabs(servicio) {
   if (!servicio) return '';
-  // For variantes-only services
   if (servicio.variantes && servicio.variantes.length && (!servicio.vehiculos || !Object.keys(servicio.vehiculos).length)) return '';
 
   const vOrder = ['auto','van','minibus'];
   const vLabels = { auto: 'Auto (1-6 pax)', van: 'Van (7-18 pax)', minibus: 'MiniBus (19-23 pax)' };
   const vIcons = { auto: '🚗', van: '🚐', minibus: '🚌' };
 
-  const tabs = vOrder.filter(v => servicio.vehiculos && servicio.vehiculos[v] && servicio.vehiculos[v].activo);
-  if (!tabs.length) return '';
-
-  return `<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
-    ${tabs.map(v => `<button onclick="tfSelectVehiculo('${v}')" style="padding:7px 16px;border-radius:20px;border:1px solid var(--border);background:${v===tfState.activeVehiculo?'var(--navy)':'var(--surface2)'};color:${v===tfState.activeVehiculo?'#fff':'var(--text2)'};font-weight:600;font-size:12px;cursor:pointer;font-family:'Outfit',sans-serif;display:flex;align-items:center;gap:5px">
-      ${vIcons[v]} ${vLabels[v]}
-    </button>`).join('')}
+  return `<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+    ${vOrder.map(v => {
+      const isActive = servicio.vehiculos && servicio.vehiculos[v] && servicio.vehiculos[v].activo;
+      const isCurrent = v === tfState.activeVehiculo;
+      if (isActive) {
+        return `<button onclick="tfSelectVehiculo('${v}')" style="padding:7px 16px;border-radius:20px;border:1px solid var(--border);background:${isCurrent?'var(--navy)':'var(--surface2)'};color:${isCurrent?'#fff':'var(--text2)'};font-weight:600;font-size:12px;cursor:pointer;font-family:'Outfit',sans-serif;display:flex;align-items:center;gap:5px">${vIcons[v]} ${vLabels[v]}</button>`;
+      } else {
+        return `<button onclick="tfActivateTier('${servicio.id}','${v}')" title="Crear tier ${vLabels[v]}" style="padding:7px 16px;border-radius:20px;border:1px dashed rgba(43,188,204,0.35);background:transparent;color:rgba(43,188,204,0.5);font-weight:600;font-size:12px;cursor:pointer;font-family:'Outfit',sans-serif;display:flex;align-items:center;gap:5px">+ ${vIcons[v]} ${vLabels[v]}</button>`;
+      }
+    }).join('')}
   </div>`;
 }
 
@@ -245,10 +247,25 @@ function tfRenderTableSection(servicio, tc) {
   const isDirty = tfState.dirty[servicio.id];
   const saveBtn = `<button class="tf-save-btn${isDirty?'':' disabled'}" ${isDirty?'':'disabled'} onclick="tfSave('${servicio.id}')">Guardar cambios</button>`;
 
+  // Ventas commission link selector
+  const ventasServs = (typeof state !== 'undefined' ? (state?.ventas?.servicios || []) : []);
+  const linkedId = servicio.ventasServiceId || '';
+  const ventasLinkHtml = `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;padding:9px 12px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
+    <span style="font-size:11px;font-weight:700;color:var(--text3);white-space:nowrap">🔗 Comisión Ventas:</span>
+    <select onchange="tfSetVentasLink('${servicio.id}',this.value)" style="font-size:11.5px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);font-family:'Outfit',sans-serif">
+      <option value="">— Manual —</option>
+      ${ventasServs.map(vs=>`<option value="${vs.id}"${linkedId===vs.id?' selected':''}>${vs.nombre}</option>`).join('')}
+    </select>
+    ${linkedId
+      ? `<span style="font-size:11px;color:var(--teal);font-weight:600">✓ Vinculado · columna comisión automática</span>`
+      : `<span style="font-size:11px;color:var(--text3)">Vinculá para usar la comisión configurada en Ventas</span>`}
+  </div>`;
+
   // Variantes mode
   if (servicio.variantes && servicio.variantes.length) {
     return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">
-      <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:14px">${servicio.nombre} <span style="font-size:11px;font-weight:500;color:var(--text3);margin-left:6px">${servicio.duracionHs}hs</span></div>
+      <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:10px">${servicio.nombre} <span style="font-size:11px;font-weight:500;color:var(--text3);margin-left:6px">${servicio.duracionHs}hs</span></div>
+      ${ventasLinkHtml}
       ${tfRenderVariantesTable(servicio, tc)}
       ${saveBtn}
     </div>`;
@@ -256,12 +273,17 @@ function tfRenderTableSection(servicio, tc) {
 
   // Vehiculo mode
   const vehiculoData = servicio.vehiculos && servicio.vehiculos[tfState.activeVehiculo];
+  const tierLabel = {auto:'Auto',van:'Van',minibus:'MiniBus'}[tfState.activeVehiculo] || tfState.activeVehiculo;
   if (!vehiculoData || !vehiculoData.activo) {
-    return `<div style="text-align:center;padding:32px;color:var(--text3);background:var(--surface);border:1px solid var(--border);border-radius:12px">Sin tarifas para este vehículo.</div>`;
+    return `<div style="text-align:center;padding:32px;color:var(--text3);background:var(--surface);border:1px solid var(--border);border-radius:12px">
+      <div style="margin-bottom:12px">No hay tarifas para el tier <strong>${tierLabel}</strong>.</div>
+      <button onclick="tfActivateTier('${servicio.id}','${tfState.activeVehiculo}')" style="background:rgba(43,188,204,0.12);color:var(--teal);border:1px solid rgba(43,188,204,0.3);padding:8px 22px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;font-family:'Outfit',sans-serif">+ Crear tier ${tierLabel}</button>
+    </div>`;
   }
 
   return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">
-    <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:14px">${servicio.nombre} <span style="font-size:11px;font-weight:500;color:var(--text3);margin-left:6px">${servicio.duracionHs}hs</span></div>
+    <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:10px">${servicio.nombre} <span style="font-size:11px;font-weight:500;color:var(--text3);margin-left:6px">${servicio.duracionHs}hs</span></div>
+    ${ventasLinkHtml}
     ${tfRenderTable(servicio, tfState.activeVehiculo, tc)}
     ${saveBtn}
   </div>`;
@@ -271,85 +293,102 @@ function tfRenderTableSection(servicio, tc) {
 
 function tfRenderTable(servicio, vehiculoKey, tc) {
   const vehiculoData = servicio.vehiculos[vehiculoKey];
+  const addRowBtn = `<div style="margin-top:8px"><button onclick="tfAddRow('${servicio.id}','${vehiculoKey}')" style="display:flex;align-items:center;gap:6px;background:rgba(43,188,204,0.08);color:var(--teal);border:1px dashed rgba(43,188,204,0.3);border-radius:7px;padding:6px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif">+ Agregar fila de pax</button></div>`;
   if (!vehiculoData || !vehiculoData.tarifas || !vehiculoData.tarifas.length) {
-    return `<div style="color:var(--text3);font-size:12px;padding:12px 0">Sin filas de tarifas cargadas.</div>`;
+    return `<div style="color:var(--text3);font-size:12px;padding:8px 0">Sin filas aún.</div>${addRowBtn}`;
   }
   const rows = vehiculoData.tarifas;
+  const linked = servicio.ventasServiceId;
 
   const header = `<tr>
-    <th style="text-align:center">Pax</th>
-    <th>USD</th>
-    <th>Reales BRL</th>
-    <th>Comisión USD</th>
-    <th>Tarifa Guía USD</th>
+    <th style="text-align:center;width:58px">Pax</th>
+    <th>USD</th><th>Reales BRL</th>
+    <th>Comisión${linked?' 🔗':''}</th>
+    <th>Tarifa Guía</th>
     <th>Costo Paseo ARS</th>
     <th>Costo Transp. ARS</th>
-    <th>Conversión USD</th>
+    <th>Conversión</th>
     <th>Ganancia USD</th>
     <th>Margen %</th>
     <th>Gan. -10%</th>
+    <th style="width:26px"></th>
   </tr>`;
 
   const trs = rows.map((row, idx) => {
-    const calc = tarifasCalcRow(row, tc);
+    const ventasCom = linked ? tfGetVentasComision(linked, row.pax) : null;
+    const rowCalc = ventasCom !== null ? {...row, comisionUsd: ventasCom} : row;
+    const calc = tarifasCalcRow(rowCalc, tc);
     const color = tarifasMargenColor(calc.margenPct, calc.gananciaUsd);
-    const ganClass = `tf-margen-${color}`;
+    const cls = `tf-margen-${color}`;
+    const comCell = linked
+      ? `<td class="tf-cell-calc" style="color:var(--teal);font-weight:700">${tfFmtUSD(ventasCom??0)} <span style="font-size:9px;opacity:.55">🔗</span></td>`
+      : `<td><input type="number" class="tf-cell-edit" value="${row.comisionUsd}" oninput="tfOnEditCell('${servicio.id}','${vehiculoKey}',${idx},'comisionUsd',this.value)"></td>`;
     return `<tr>
-      <td style="text-align:center;font-weight:700;color:var(--text3);font-size:11px">${row.pax}</td>
+      <td style="text-align:center"><input type="number" class="tf-cell-edit" style="width:48px;text-align:center;font-weight:700" value="${row.pax}" oninput="tfOnEditCell('${servicio.id}','${vehiculoKey}',${idx},'pax',this.value)"></td>
       <td><input type="number" class="tf-cell-edit" value="${row.usd}" oninput="tfOnEditCell('${servicio.id}','${vehiculoKey}',${idx},'usd',this.value)"></td>
       <td class="tf-cell-calc">${tfFmtBRL(calc.precioReales)}</td>
-      <td><input type="number" class="tf-cell-edit" value="${row.comisionUsd}" oninput="tfOnEditCell('${servicio.id}','${vehiculoKey}',${idx},'comisionUsd',this.value)"></td>
+      ${comCell}
       <td><input type="number" class="tf-cell-edit" value="${row.tarifaGuiaUsd}" oninput="tfOnEditCell('${servicio.id}','${vehiculoKey}',${idx},'tarifaGuiaUsd',this.value)"></td>
-      <td><input type="number" class="tf-cell-edit" style="width:90px" value="${row.costoPaseoArs}" oninput="tfOnEditCell('${servicio.id}','${vehiculoKey}',${idx},'costoPaseoArs',this.value)"></td>
-      <td><input type="number" class="tf-cell-edit" style="width:90px" value="${row.costoTransporteArs}" oninput="tfOnEditCell('${servicio.id}','${vehiculoKey}',${idx},'costoTransporteArs',this.value)"></td>
+      <td><input type="number" class="tf-cell-edit" style="width:88px" value="${row.costoPaseoArs}" oninput="tfOnEditCell('${servicio.id}','${vehiculoKey}',${idx},'costoPaseoArs',this.value)"></td>
+      <td><input type="number" class="tf-cell-edit" style="width:88px" value="${row.costoTransporteArs}" oninput="tfOnEditCell('${servicio.id}','${vehiculoKey}',${idx},'costoTransporteArs',this.value)"></td>
       <td class="tf-cell-calc">${tfFmtUSD(calc.conversionUsd)}</td>
-      <td><span class="${ganClass}">${tfFmtUSD(calc.gananciaUsd)}</span></td>
-      <td><span class="${ganClass}">${tfFmtPct(calc.margenPct)}</span></td>
+      <td><span class="${cls}">${tfFmtUSD(calc.gananciaUsd)}</span></td>
+      <td><span class="${cls}">${tfFmtPct(calc.margenPct)}</span></td>
       <td class="tf-cell-calc" style="${calc.gananciaConDescuento<=0?'color:var(--red)':''}">${tfFmtUSD(calc.gananciaConDescuento)}</td>
+      <td><button onclick="tfDelRow('${servicio.id}','${vehiculoKey}',${idx})" title="Eliminar fila" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:13px;padding:2px 4px;opacity:.55">✕</button></td>
     </tr>`;
   }).join('');
 
-  return `<div class="tf-table-wrap"><table class="tf-table"><thead>${header}</thead><tbody>${trs}</tbody></table></div>`;
+  return `<div class="tf-table-wrap"><table class="tf-table"><thead>${header}</thead><tbody>${trs}</tbody></table></div>${addRowBtn}`;
 }
 
 // ─── VARIANTES TABLE ───────────────────────────────────────────────────────
 
 function tfRenderVariantesTable(servicio, tc) {
-  const variantes = servicio.variantes;
+  const variantes = servicio.variantes || [];
+  const linked = servicio.ventasServiceId;
+
   const header = `<tr>
-    <th style="text-align:left">Variante</th>
-    <th>USD</th>
-    <th>Reales BRL</th>
-    <th>Comisión USD</th>
-    <th>Tarifa Guía USD</th>
+    <th style="text-align:left;width:130px">Variante</th>
+    <th>USD</th><th>Reales BRL</th>
+    <th>Comisión${linked?' 🔗':''}</th>
+    <th>Tarifa Guía</th>
     <th>Costo Paseo ARS</th>
     <th>Costo Transp. ARS</th>
-    <th>Conversión USD</th>
+    <th>Conversión</th>
     <th>Ganancia USD</th>
     <th>Margen %</th>
     <th>Gan. -10%</th>
+    <th style="width:26px"></th>
   </tr>`;
 
   const trs = variantes.map((row, idx) => {
-    const calc = tarifasCalcRow(row, tc);
+    const ventasCom = linked ? tfGetVentasComision(linked, 1) : null;
+    const rowCalc = ventasCom !== null ? {...row, comisionUsd: ventasCom} : row;
+    const calc = tarifasCalcRow(rowCalc, tc);
     const color = tarifasMargenColor(calc.margenPct, calc.gananciaUsd);
-    const ganClass = `tf-margen-${color}`;
+    const cls = `tf-margen-${color}`;
+    const comCell = linked
+      ? `<td class="tf-cell-calc" style="color:var(--teal);font-weight:700">${tfFmtUSD(ventasCom??0)} <span style="font-size:9px;opacity:.55">🔗</span></td>`
+      : `<td><input type="number" class="tf-cell-edit" value="${row.comisionUsd}" oninput="tfOnEditCell('${servicio.id}','variante',${idx},'comisionUsd',this.value)"></td>`;
     return `<tr>
-      <td style="text-align:left;font-weight:600;color:var(--text);font-size:12px">${row.nombre}</td>
+      <td><input type="text" class="tf-cell-edit" style="text-align:left;width:120px;font-weight:600" value="${(row.nombre||'').replace(/"/g,'&quot;')}" oninput="tfOnEditVarianteName('${servicio.id}',${idx},this.value)"></td>
       <td><input type="number" class="tf-cell-edit" value="${row.usd}" oninput="tfOnEditCell('${servicio.id}','variante',${idx},'usd',this.value)"></td>
       <td class="tf-cell-calc">${tfFmtBRL(calc.precioReales)}</td>
-      <td><input type="number" class="tf-cell-edit" value="${row.comisionUsd}" oninput="tfOnEditCell('${servicio.id}','variante',${idx},'comisionUsd',this.value)"></td>
+      ${comCell}
       <td><input type="number" class="tf-cell-edit" value="${row.tarifaGuiaUsd}" oninput="tfOnEditCell('${servicio.id}','variante',${idx},'tarifaGuiaUsd',this.value)"></td>
-      <td><input type="number" class="tf-cell-edit" style="width:90px" value="${row.costoPaseoArs}" oninput="tfOnEditCell('${servicio.id}','variante',${idx},'costoPaseoArs',this.value)"></td>
-      <td><input type="number" class="tf-cell-edit" style="width:90px" value="${row.costoTransporteArs}" oninput="tfOnEditCell('${servicio.id}','variante',${idx},'costoTransporteArs',this.value)"></td>
+      <td><input type="number" class="tf-cell-edit" style="width:88px" value="${row.costoPaseoArs}" oninput="tfOnEditCell('${servicio.id}','variante',${idx},'costoPaseoArs',this.value)"></td>
+      <td><input type="number" class="tf-cell-edit" style="width:88px" value="${row.costoTransporteArs}" oninput="tfOnEditCell('${servicio.id}','variante',${idx},'costoTransporteArs',this.value)"></td>
       <td class="tf-cell-calc">${tfFmtUSD(calc.conversionUsd)}</td>
-      <td><span class="${ganClass}">${tfFmtUSD(calc.gananciaUsd)}</span></td>
-      <td><span class="${ganClass}">${tfFmtPct(calc.margenPct)}</span></td>
+      <td><span class="${cls}">${tfFmtUSD(calc.gananciaUsd)}</span></td>
+      <td><span class="${cls}">${tfFmtPct(calc.margenPct)}</span></td>
       <td class="tf-cell-calc" style="${calc.gananciaConDescuento<=0?'color:var(--red)':''}">${tfFmtUSD(calc.gananciaConDescuento)}</td>
+      <td><button onclick="tfDelVariante('${servicio.id}',${idx})" title="Eliminar variante" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:13px;padding:2px 4px;opacity:.55">✕</button></td>
     </tr>`;
   }).join('');
 
-  return `<div class="tf-table-wrap"><table class="tf-table"><thead>${header}</thead><tbody>${trs}</tbody></table></div>`;
+  const addBtn = `<div style="margin-top:8px"><button onclick="tfAddVariante('${servicio.id}')" style="display:flex;align-items:center;gap:6px;background:rgba(43,188,204,0.08);color:var(--teal);border:1px dashed rgba(43,188,204,0.3);border-radius:7px;padding:6px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif">+ Agregar variante</button></div>`;
+  return `<div class="tf-table-wrap"><table class="tf-table"><thead>${header}</thead><tbody>${trs}</tbody></table></div>${addBtn}`;
 }
 
 // ─── EDIT CELL ─────────────────────────────────────────────────────────────
@@ -357,7 +396,7 @@ function tfRenderVariantesTable(servicio, tc) {
 function tfOnEditCell(servicioId, vehiculoOVariante, idx, campo, value) {
   const s = tfState.servicios.find(x => x.id === servicioId);
   if (!s) return;
-  const v = parseFloat(value) || 0;
+  const v = campo === 'pax' ? (parseInt(value) || 0) : (parseFloat(value) || 0);
 
   if (vehiculoOVariante === 'variante') {
     if (!s.variantes || !s.variantes[idx]) return;
@@ -411,6 +450,91 @@ function tfRecalcRowDOM(servicioId, vehiculoOVariante, idx) {
   if (cells[10]) {
     cells[10].innerHTML = `<span class="tf-cell-calc" style="${calc.gananciaConDescuento<=0?'color:var(--red)':''}">${tfFmtUSD(calc.gananciaConDescuento)}</span>`;
   }
+}
+
+// ─── VENTAS COMMISSION LINK ────────────────────────────────────────────────
+
+function tfGetVentasComision(ventasServiceId, pax) {
+  const svcs = (typeof state !== 'undefined') ? (state?.ventas?.servicios || []) : [];
+  const svc = svcs.find(s => s.id === ventasServiceId);
+  if (!svc || !svc.tarifas || !svc.tarifas.length) return null;
+  const t = svc.tarifas.find(t => pax >= t.minPax && (t.maxPax === 0 || pax <= t.maxPax));
+  if (!t) return null;
+  return +(t.porPasajero ? t.comision * pax : t.comision);
+}
+
+function tfSetVentasLink(servicioId, ventasServiceId) {
+  const s = tfState.servicios.find(x => x.id === servicioId);
+  if (!s) return;
+  s.ventasServiceId = ventasServiceId || null;
+  tfState.dirty[servicioId] = true;
+  tfRender();
+}
+
+// ─── ADD / DELETE ROWS ─────────────────────────────────────────────────────
+
+function tfActivateTier(servicioId, vehiculoKey) {
+  const s = tfState.servicios.find(x => x.id === servicioId);
+  if (!s) return;
+  if (!s.vehiculos) s.vehiculos = {};
+  if (!s.vehiculos[vehiculoKey]) s.vehiculos[vehiculoKey] = {};
+  s.vehiculos[vehiculoKey].activo = true;
+  if (!s.vehiculos[vehiculoKey].tarifas) s.vehiculos[vehiculoKey].tarifas = [];
+  const paxStart = { auto: 1, van: 7, minibus: 19 };
+  s.vehiculos[vehiculoKey].tarifas.push({
+    pax: paxStart[vehiculoKey] || 1, usd: 0, comisionUsd: 0, tarifaGuiaUsd: 0,
+    costoPaseoArs: 0, costoTransporteArs: 0
+  });
+  tfState.dirty[servicioId] = true;
+  tfState.activeVehiculo = vehiculoKey;
+  tfRender();
+  if (typeof mostrarToast === 'function') mostrarToast(`Tier ${vehiculoKey} activado — completá los valores y guardá`);
+}
+
+function tfAddRow(servicioId, vehiculoKey) {
+  const s = tfState.servicios.find(x => x.id === servicioId);
+  if (!s || !s.vehiculos || !s.vehiculos[vehiculoKey]) return;
+  const tarifas = s.vehiculos[vehiculoKey].tarifas || [];
+  const lastPax = tarifas.length > 0 ? (tarifas[tarifas.length - 1].pax || 0) : 0;
+  tarifas.push({ pax: lastPax + 1, usd: 0, comisionUsd: 0, tarifaGuiaUsd: 0, costoPaseoArs: 0, costoTransporteArs: 0 });
+  s.vehiculos[vehiculoKey].tarifas = tarifas;
+  tfState.dirty[servicioId] = true;
+  tfRender();
+}
+
+function tfDelRow(servicioId, vehiculoKey, idx) {
+  const s = tfState.servicios.find(x => x.id === servicioId);
+  if (!s || !s.vehiculos || !s.vehiculos[vehiculoKey]) return;
+  s.vehiculos[vehiculoKey].tarifas.splice(idx, 1);
+  if (!s.vehiculos[vehiculoKey].tarifas.length) s.vehiculos[vehiculoKey].activo = false;
+  tfState.dirty[servicioId] = true;
+  tfRender();
+}
+
+function tfAddVariante(servicioId) {
+  const s = tfState.servicios.find(x => x.id === servicioId);
+  if (!s) return;
+  if (!s.variantes) s.variantes = [];
+  s.variantes.push({ nombre: 'Nueva variante', usd: 0, comisionUsd: 0, tarifaGuiaUsd: 0, costoPaseoArs: 0, costoTransporteArs: 0 });
+  tfState.dirty[servicioId] = true;
+  tfRender();
+}
+
+function tfDelVariante(servicioId, idx) {
+  const s = tfState.servicios.find(x => x.id === servicioId);
+  if (!s || !s.variantes) return;
+  s.variantes.splice(idx, 1);
+  tfState.dirty[servicioId] = true;
+  tfRender();
+}
+
+function tfOnEditVarianteName(servicioId, idx, value) {
+  const s = tfState.servicios.find(x => x.id === servicioId);
+  if (!s || !s.variantes || !s.variantes[idx]) return;
+  s.variantes[idx].nombre = value;
+  tfState.dirty[servicioId] = true;
+  const saveBtn = document.querySelector('.tf-save-btn');
+  if (saveBtn) { saveBtn.disabled = false; saveBtn.classList.remove('disabled'); }
 }
 
 // ─── TC EDIT ───────────────────────────────────────────────────────────────
