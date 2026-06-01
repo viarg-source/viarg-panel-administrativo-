@@ -247,7 +247,24 @@ function tfRenderTableSection(servicio, tc) {
   const isDirty = tfState.dirty[servicio.id];
   const saveBtn = `<button class="tf-save-btn${isDirty?'':' disabled'}" ${isDirty?'':'disabled'} onclick="tfSave('${servicio.id}')">Guardar cambios</button>`;
 
-  // Ventas commission link selector
+  // ── Ticket config
+  const ticketARS = servicio.ticketARS || 0;
+  const ticketHtml = `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;padding:9px 12px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
+    <span style="font-size:11px;font-weight:700;color:var(--text3);white-space:nowrap">🎫 Ticket entrada:</span>
+    <div style="display:flex;align-items:center;gap:5px">
+      <span style="font-size:12px;color:var(--text3);font-family:'JetBrains Mono',monospace">$</span>
+      <input id="tf-ticket-${servicio.id}" type="number" min="0" placeholder="0"
+        value="${ticketARS || ''}"
+        oninput="tfSetTicket('${servicio.id}',this.value)"
+        style="width:110px;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);outline:none">
+      <span style="font-size:11px;color:var(--text3)">ARS/pax</span>
+    </div>
+    ${ticketARS > 0
+      ? `<span style="font-size:11px;color:var(--teal);font-weight:600">→ Costo Paseo = ${new Intl.NumberFormat('es-AR').format(ticketARS)} × pax (automático)</span>`
+      : `<span style="font-size:11px;color:var(--text3)">Configura el costo de entrada por persona — se aplica a todas las filas</span>`}
+  </div>`;
+
+  // ── Ventas commission link selector
   const ventasServs = (typeof state !== 'undefined' ? (state?.ventas?.servicios || []) : []);
   const linkedId = servicio.ventasServiceId || '';
   const ventasLinkHtml = `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;padding:9px 12px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
@@ -265,6 +282,7 @@ function tfRenderTableSection(servicio, tc) {
   if (servicio.variantes && servicio.variantes.length) {
     return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">
       <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:10px">${servicio.nombre} <span style="font-size:11px;font-weight:500;color:var(--text3);margin-left:6px">${servicio.duracionHs}hs</span></div>
+      ${ticketHtml}
       ${ventasLinkHtml}
       ${tfRenderVariantesTable(servicio, tc)}
       ${saveBtn}
@@ -283,6 +301,7 @@ function tfRenderTableSection(servicio, tc) {
 
   return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">
     <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:10px">${servicio.nombre} <span style="font-size:11px;font-weight:500;color:var(--text3);margin-left:6px">${servicio.duracionHs}hs</span></div>
+    ${ticketHtml}
     ${ventasLinkHtml}
     ${tfRenderTable(servicio, tfState.activeVehiculo, tc)}
     ${saveBtn}
@@ -299,13 +318,14 @@ function tfRenderTable(servicio, vehiculoKey, tc) {
   }
   const rows = vehiculoData.tarifas;
   const linked = servicio.ventasServiceId;
+  const ticketARS = servicio.ticketARS || 0;
 
   const header = `<tr>
     <th style="text-align:center;width:58px">Pax</th>
     <th>USD</th><th>Reales BRL</th>
     <th>Comisión${linked?' 🔗':''}</th>
     <th>Tarifa Guía</th>
-    <th>Costo Paseo ARS</th>
+    <th>Costo Paseo ARS${ticketARS>0?' 🎫':''}</th>
     <th>Costo Transp. ARS</th>
     <th>Conversión</th>
     <th>Ganancia USD</th>
@@ -316,20 +336,28 @@ function tfRenderTable(servicio, vehiculoKey, tc) {
 
   const trs = rows.map((row, idx) => {
     const ventasCom = linked ? tfGetVentasComision(linked, row.pax) : null;
-    const rowCalc = ventasCom !== null ? {...row, comisionUsd: ventasCom} : row;
+    const paseoEfectivo = ticketARS > 0 ? ticketARS * (row.pax || 1) : row.costoPaseoArs;
+    const rowCalc = {
+      ...row,
+      comisionUsd: ventasCom !== null ? ventasCom : row.comisionUsd,
+      costoPaseoArs: paseoEfectivo
+    };
     const calc = tarifasCalcRow(rowCalc, tc);
     const color = tarifasMargenColor(calc.margenPct, calc.gananciaUsd);
     const cls = `tf-margen-${color}`;
     const comCell = linked
       ? `<td class="tf-cell-calc" style="color:var(--teal);font-weight:700">${tfFmtUSD(ventasCom??0)} <span style="font-size:9px;opacity:.55">🔗</span></td>`
       : `<td><input type="number" class="tf-cell-edit" value="${row.comisionUsd}" oninput="tfOnEditCell('${servicio.id}','${vehiculoKey}',${idx},'comisionUsd',this.value)"></td>`;
+    const paseoCell = ticketARS > 0
+      ? `<td class="tf-cell-calc" style="color:var(--teal);font-weight:700">${tfFmtARS(paseoEfectivo)} <span style="font-size:9px;opacity:.55">🎫</span></td>`
+      : `<td><input type="number" class="tf-cell-edit" style="width:88px" value="${row.costoPaseoArs}" oninput="tfOnEditCell('${servicio.id}','${vehiculoKey}',${idx},'costoPaseoArs',this.value)"></td>`;
     return `<tr>
       <td style="text-align:center"><input type="number" class="tf-cell-edit" style="width:48px;text-align:center;font-weight:700" value="${row.pax}" oninput="tfOnEditCell('${servicio.id}','${vehiculoKey}',${idx},'pax',this.value)"></td>
       <td><input type="number" class="tf-cell-edit" value="${row.usd}" oninput="tfOnEditCell('${servicio.id}','${vehiculoKey}',${idx},'usd',this.value)"></td>
       <td class="tf-cell-calc">${tfFmtBRL(calc.precioReales)}</td>
       ${comCell}
       <td><input type="number" class="tf-cell-edit" value="${row.tarifaGuiaUsd}" oninput="tfOnEditCell('${servicio.id}','${vehiculoKey}',${idx},'tarifaGuiaUsd',this.value)"></td>
-      <td><input type="number" class="tf-cell-edit" style="width:88px" value="${row.costoPaseoArs}" oninput="tfOnEditCell('${servicio.id}','${vehiculoKey}',${idx},'costoPaseoArs',this.value)"></td>
+      ${paseoCell}
       <td><input type="number" class="tf-cell-edit" style="width:88px" value="${row.costoTransporteArs}" oninput="tfOnEditCell('${servicio.id}','${vehiculoKey}',${idx},'costoTransporteArs',this.value)"></td>
       <td class="tf-cell-calc">${tfFmtUSD(calc.conversionUsd)}</td>
       <td><span class="${cls}">${tfFmtUSD(calc.gananciaUsd)}</span></td>
@@ -347,6 +375,7 @@ function tfRenderTable(servicio, vehiculoKey, tc) {
 function tfRenderVariantesTable(servicio, tc) {
   const variantes = servicio.variantes || [];
   const linked = servicio.ventasServiceId;
+  const ticketARS = servicio.ticketARS || 0;
 
   const header = `<tr>
     <th style="text-align:left;width:130px">Variante</th>
@@ -364,20 +393,28 @@ function tfRenderVariantesTable(servicio, tc) {
 
   const trs = variantes.map((row, idx) => {
     const ventasCom = linked ? tfGetVentasComision(linked, 1) : null;
-    const rowCalc = ventasCom !== null ? {...row, comisionUsd: ventasCom} : row;
+    const paseoEfectivo = ticketARS > 0 ? ticketARS : row.costoPaseoArs;
+    const rowCalc = {
+      ...row,
+      comisionUsd: ventasCom !== null ? ventasCom : row.comisionUsd,
+      costoPaseoArs: paseoEfectivo
+    };
     const calc = tarifasCalcRow(rowCalc, tc);
     const color = tarifasMargenColor(calc.margenPct, calc.gananciaUsd);
     const cls = `tf-margen-${color}`;
     const comCell = linked
       ? `<td class="tf-cell-calc" style="color:var(--teal);font-weight:700">${tfFmtUSD(ventasCom??0)} <span style="font-size:9px;opacity:.55">🔗</span></td>`
       : `<td><input type="number" class="tf-cell-edit" value="${row.comisionUsd}" oninput="tfOnEditCell('${servicio.id}','variante',${idx},'comisionUsd',this.value)"></td>`;
+    const paseoCell = ticketARS > 0
+      ? `<td class="tf-cell-calc" style="color:var(--teal);font-weight:700">${tfFmtARS(paseoEfectivo)} <span style="font-size:9px;opacity:.55">🎫</span></td>`
+      : `<td><input type="number" class="tf-cell-edit" style="width:88px" value="${row.costoPaseoArs}" oninput="tfOnEditCell('${servicio.id}','variante',${idx},'costoPaseoArs',this.value)"></td>`;
     return `<tr>
       <td><input type="text" class="tf-cell-edit" style="text-align:left;width:120px;font-weight:600" value="${(row.nombre||'').replace(/"/g,'&quot;')}" oninput="tfOnEditVarianteName('${servicio.id}',${idx},this.value)"></td>
       <td><input type="number" class="tf-cell-edit" value="${row.usd}" oninput="tfOnEditCell('${servicio.id}','variante',${idx},'usd',this.value)"></td>
       <td class="tf-cell-calc">${tfFmtBRL(calc.precioReales)}</td>
       ${comCell}
       <td><input type="number" class="tf-cell-edit" value="${row.tarifaGuiaUsd}" oninput="tfOnEditCell('${servicio.id}','variante',${idx},'tarifaGuiaUsd',this.value)"></td>
-      <td><input type="number" class="tf-cell-edit" style="width:88px" value="${row.costoPaseoArs}" oninput="tfOnEditCell('${servicio.id}','variante',${idx},'costoPaseoArs',this.value)"></td>
+      ${paseoCell}
       <td><input type="number" class="tf-cell-edit" style="width:88px" value="${row.costoTransporteArs}" oninput="tfOnEditCell('${servicio.id}','variante',${idx},'costoTransporteArs',this.value)"></td>
       <td class="tf-cell-calc">${tfFmtUSD(calc.conversionUsd)}</td>
       <td><span class="${cls}">${tfFmtUSD(calc.gananciaUsd)}</span></td>
@@ -432,24 +469,30 @@ function tfRecalcRowDOM(servicioId, vehiculoOVariante, idx) {
   }
   if (!row) return;
 
-  const calc = tarifasCalcRow(row, tc);
+  // Apply ticket and ventas commission overrides
+  const ticketARS = s.ticketARS || 0;
+  const ventasCom = s.ventasServiceId ? tfGetVentasComision(s.ventasServiceId, row.pax || 1) : null;
+  const rowForCalc = {
+    ...row,
+    comisionUsd: ventasCom !== null ? ventasCom : row.comisionUsd,
+    costoPaseoArs: ticketARS > 0 ? ticketARS * (row.pax || 1) : row.costoPaseoArs
+  };
+  const calc = tarifasCalcRow(rowForCalc, tc);
   const color = tarifasMargenColor(calc.margenPct, calc.gananciaUsd);
 
-  // Find the table row - it's the (idx+1)th tbody row
   const table = document.querySelector('.tf-table tbody');
   if (!table) return;
   const tr = table.rows[idx];
   if (!tr) return;
 
-  // Columns: pax(0) usd(1) reales(2) com(3) guia(4) paseo(5) transp(6) conv(7) gan(8) margen(9) gan10(10)
+  // cols: pax(0) usd(1) reales(2) com(3) guia(4) paseo(5) transp(6) conv(7) gan(8) margen(9) gan10(10) del(11)
   const cells = tr.cells;
-  if (cells[2]) cells[2].innerHTML = `<span class="tf-cell-calc">${tfFmtBRL(calc.precioReales)}</span>`;
-  if (cells[7]) cells[7].innerHTML = `<span class="tf-cell-calc">${tfFmtUSD(calc.conversionUsd)}</span>`;
+  if (cells[2]) cells[2].textContent = tfFmtBRL(calc.precioReales);
+  if (cells[5] && ticketARS > 0) cells[5].innerHTML = `<span style="color:var(--teal);font-weight:700;font-family:'JetBrains Mono',monospace;font-size:12px">${tfFmtARS(rowForCalc.costoPaseoArs)} <span style="font-size:9px;opacity:.55">🎫</span></span>`;
+  if (cells[7]) cells[7].textContent = tfFmtUSD(calc.conversionUsd);
   if (cells[8]) cells[8].innerHTML = `<span class="tf-margen-${color}">${tfFmtUSD(calc.gananciaUsd)}</span>`;
   if (cells[9]) cells[9].innerHTML = `<span class="tf-margen-${color}">${tfFmtPct(calc.margenPct)}</span>`;
-  if (cells[10]) {
-    cells[10].innerHTML = `<span class="tf-cell-calc" style="${calc.gananciaConDescuento<=0?'color:var(--red)':''}">${tfFmtUSD(calc.gananciaConDescuento)}</span>`;
-  }
+  if (cells[10]) cells[10].innerHTML = `<span class="tf-cell-calc" style="${calc.gananciaConDescuento<=0?'color:var(--red)':''}">${tfFmtUSD(calc.gananciaConDescuento)}</span>`;
 }
 
 // ─── VENTAS COMMISSION LINK ────────────────────────────────────────────────
@@ -461,6 +504,26 @@ function tfGetVentasComision(ventasServiceId, pax) {
   const t = svc.tarifas.find(t => pax >= t.minPax && (t.maxPax === 0 || pax <= t.maxPax));
   if (!t) return null;
   return +(t.porPasajero ? t.comision * pax : t.comision);
+}
+
+function tfSetTicket(servicioId, value) {
+  const s = tfState.servicios.find(x => x.id === servicioId);
+  if (!s) return;
+  s.ticketARS = parseFloat(value) || 0;
+  tfState.dirty[servicioId] = true;
+  const saveBtn = document.querySelector('.tf-save-btn');
+  if (saveBtn) { saveBtn.disabled = false; saveBtn.classList.remove('disabled'); }
+  // Recalculate rows live without losing focus on the input
+  const vKey = tfState.activeVehiculo;
+  const rows = s.variantes
+    ? s.variantes
+    : (s.vehiculos && s.vehiculos[vKey] && s.vehiculos[vKey].tarifas) || [];
+  rows.forEach((_, idx) => tfRecalcRowDOM(s.id, s.variantes ? 'variante' : vKey, idx));
+  // Update ticket label
+  const lbl = document.getElementById(`tf-ticket-lbl-${servicioId}`);
+  if (lbl) lbl.textContent = s.ticketARS > 0
+    ? `→ Costo Paseo = ${new Intl.NumberFormat('es-AR').format(s.ticketARS)} × pax (automático)`
+    : 'Configura el costo de entrada por persona — se aplica a todas las filas';
 }
 
 function tfSetVentasLink(servicioId, ventasServiceId) {
