@@ -1478,6 +1478,44 @@ body.sb-collapsed .sidebar:not(:hover) .sidebar-footer-btns { flex-direction: co
 @media (max-width:700px) { .cotiz-grid { grid-template-columns:1fr; } .cotiz-action-row .btn { flex:1 1 100%; } }
 [data-theme="dark"] .cotiz-tab.active { background:var(--surface2); box-shadow:none; }
 [data-theme="dark"] .cotiz-breakdown { background:var(--surface2); border-color:var(--border); }
+
+/* ── TARIFAS MODULE ── */
+.tf-tc-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;align-items:stretch}
+.tf-tc-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;min-width:120px;flex:1}
+.tf-tc-label{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px}
+.tf-tc-value{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:800;color:var(--text)}
+.tf-tc-live{font-size:9px;background:rgba(0,210,150,0.15);color:#00d296;border-radius:4px;padding:1px 5px;font-weight:700;margin-left:6px;vertical-align:middle}
+.tf-tc-manual{font-size:9px;background:rgba(255,171,0,0.15);color:var(--orange);border-radius:4px;padding:1px 5px;font-weight:700;margin-left:6px;vertical-align:middle}
+.tf-tc-input{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:800;color:var(--text);background:transparent;border:none;outline:none;width:90px;border-bottom:1px dashed var(--border)}
+.tf-service-selector{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.tf-service-btn{padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);font-size:12px;font-weight:600;cursor:pointer;font-family:'Outfit',sans-serif;transition:all .15s;white-space:nowrap}
+.tf-service-btn.active{background:var(--teal);color:#060F1E;border-color:var(--teal)}
+.tf-table-wrap{overflow-x:auto;margin-top:8px}
+.tf-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.tf-table th{background:var(--surface2);padding:8px 10px;text-align:right;font-size:10.5px;font-weight:700;color:var(--text3);white-space:nowrap;border-bottom:2px solid var(--border);position:sticky;top:0}
+.tf-table th:first-child,.tf-table td:first-child{text-align:center}
+.tf-table td{padding:7px 10px;text-align:right;border-bottom:1px solid var(--border-light);vertical-align:middle}
+.tf-table tr:hover td{background:rgba(43,188,204,0.04)}
+.tf-cell-edit{font-family:'JetBrains Mono',monospace;background:transparent;border:none;outline:none;text-align:right;width:70px;color:var(--text);font-size:12.5px;font-weight:600}
+.tf-cell-edit:focus{background:rgba(43,188,204,0.08);border-radius:4px;padding:2px 4px}
+.tf-cell-calc{color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:12px}
+.tf-margen-green{font-weight:800;color:#00d296}
+.tf-margen-yellow{font-weight:800;color:var(--orange)}
+.tf-margen-red{font-weight:800;color:var(--red)}
+.tf-margen-neg{font-weight:800;color:var(--red);background:rgba(239,68,68,0.1);border-radius:4px;padding:1px 5px}
+.tf-save-btn{margin-top:12px;padding:8px 22px;background:var(--teal);color:#060F1E;border:none;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer;font-family:'Outfit',sans-serif}
+.tf-save-btn.disabled{opacity:.5;cursor:default}
+.tf-kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.tf-kpi{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.tf-kpi-val{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:800;color:var(--text)}
+.tf-kpi-label{font-size:11px;color:var(--text3);margin-top:3px}
+.tf-skeleton{background:linear-gradient(90deg,var(--surface2) 25%,var(--surface) 50%,var(--surface2) 75%);background-size:200% 100%;animation:tf-shimmer 1.5s infinite;border-radius:8px;height:32px;width:100%;margin-bottom:8px}
+@keyframes tf-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@media(max-width:768px){.tf-kpi-row{grid-template-columns:repeat(2,1fr)}.tf-tc-bar{gap:8px}.tf-table th,.tf-table td{padding:6px 7px;font-size:11px}}
+[data-theme="dark"] .tf-tc-card,[data-theme="dark"] .tf-kpi{background:var(--surface);border-color:var(--border)}
+[data-theme="dark"] .tf-cell-edit{color:var(--text)}
+[data-theme="dark"] .tf-tc-input{color:var(--text)}
 </style>
 </head>
 <body>
@@ -1497,6 +1535,7 @@ body.sb-collapsed .sidebar:not(:hover) .sidebar-footer-btns { flex-direction: co
   <button class="nav-item" data-section="cotizador" onclick="switchSection('cotizador')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 13h.01M13 13h.01M17 13h.01M17 17h.01M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"/></svg><span class="nav-label">Cotizador</span><span style="font-size:9px;font-weight:800;background:var(--teal);color:#060F1E;border-radius:4px;padding:1px 5px;letter-spacing:.5px;line-height:1.4;flex-shrink:0">BETA</span></button>
   <button class="nav-item" data-section="h1" onclick="switchSection('h1')"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M5 17H3a1 1 0 01-1-1v-4l2.5-6h13l2.5 6v4a1 1 0 01-1 1h-2"/><circle cx="7.5" cy="17" r="2"/><circle cx="16.5" cy="17" r="2"/><path d="M7.5 17h9"/></svg><span class="nav-label">Vehículos</span></button>
   <button class="nav-item" data-section="config" onclick="switchSection('config')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg><span class="nav-label">Configuración</span></button>
+  <button class="nav-item" data-section="tarifas" onclick="switchSection('tarifas')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 13h.01M13 13h.01M17 13h.01M17 17h.01M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"/></svg><span class="nav-label">Tarifas</span></button>
   <div id="sidebar-user" style="display:none; padding:10px 16px 4px; border-top:1px solid rgba(255,255,255,0.06);">
     <div style="font-size:11px; color:rgba(255,255,255,0.4);">Sesión iniciada</div>
     <div id="sidebar-user-name" style="font-size:12px; color:rgba(255,255,255,0.75); font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
@@ -2328,6 +2367,9 @@ body.sb-collapsed .sidebar:not(:hover) .sidebar-footer-btns { flex-direction: co
       <div id="h1-table-wrap"></div>
     </div>
 
+    <div id="section-tarifas" style="display:none">
+      <div id="tf-root"></div>
+    </div>
 
   </div>
 </div>
@@ -2528,7 +2570,7 @@ body.sb-collapsed .sidebar:not(:hover) .sidebar-footer-btns { flex-direction: co
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, onAuthStateChanged, signOut, createUserWithEmailAndPassword, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 const app = initializeApp({apiKey:"AIzaSyD-GEKYRRLQvqX588H0YMMypRz1kKz2rQM",authDomain:"cuentasguias-viarg.firebaseapp.com",projectId:"cuentasguias-viarg",storageBucket:"cuentasguias-viarg.firebasestorage.app",messagingSenderId:"1020802203780",appId:"1:1020802203780:web:d5a95818c43e71835602d1"});
 const db = getFirestore(app), DOC = doc(db,'app','liquidaciones');
 window._dbGet = async()=>{const s=await getDoc(DOC);return s.exists()?s.data():null;};
@@ -2546,6 +2588,12 @@ window._dbGetUsers = async()=>{const s=await getDoc(window._usersDoc);return s.e
 window._dbSetUsers = async(d)=>{await setDoc(window._usersDoc,d);};
 window._onDataChange = (cb)=>onSnapshot(DOC,(snap)=>{if(snap.exists())cb(snap.data());});
 window._onUsersChange = (cb)=>onSnapshot(window._usersDoc,(snap)=>{if(snap.exists())cb(snap.data());});
+const TF_CONFIG_DOC = doc(db,'tarifas_config','actual');
+const TF_SERVICIOS_COL = collection(db,'tarifas_servicios');
+window._tfGetConfig = async()=>{const s=await getDoc(TF_CONFIG_DOC);return s.exists()?s.data():null;};
+window._tfSetConfig = async(d)=>{await setDoc(TF_CONFIG_DOC,d);};
+window._tfGetServicios = async()=>{const snap=await getDocs(TF_SERVICIOS_COL);return snap.docs.map(d=>({id:d.id,...d.data()}));};
+window._tfSetServicio = async(id,d)=>{await setDoc(doc(db,'tarifas_servicios',id),d);};
 window.dispatchEvent(new Event('firebase-ready'));
 </script>
 <script>
@@ -2555,7 +2603,7 @@ let msgGuiaActiva=null,saveTimeout=null;
 // ===== AUTH =====
 let currentUser = null; // { uid, email, nombre, role, sections }
 let usersCache = {};
-const ALL_SECTIONS = ['dashboard','guias','cuentas-guias','finanzas','reportes','ventas','cotizador','h1','config'];
+const ALL_SECTIONS = ['dashboard','guias','cuentas-guias','finanzas','reportes','ventas','cotizador','h1','config','tarifas'];
 const GUIA_SECTIONS = ['dashboard','guias'];
 const _LS_KEY = 'viarg-local-auth';
 function _checkLocalSession(){
@@ -2571,7 +2619,8 @@ const SECTION_LABELS = {
   'ventas': 'Ventas',
   'cotizador': 'Cotizador',
   'config': 'Configuración',
-  'h1': 'Vehículos'
+  'h1': 'Vehículos',
+  'tarifas': 'Tarifas'
 };
 
 function toggleSidebar(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('sidebar-overlay').classList.toggle('open');}
@@ -2588,7 +2637,7 @@ function switchSection(n){
   document.querySelectorAll('.nav-item').forEach(e=>e.classList.remove('active'));
   document.querySelector('.nav-item[data-section="'+n+'"]')?.classList.add('active');
   // Show/hide sections
-  ['section-dashboard','section-guias','section-cuentas-guias','section-reportes','section-finanzas','section-config','section-ventas','section-h1','section-cotizador'].forEach(id=>{
+  ['section-dashboard','section-guias','section-cuentas-guias','section-reportes','section-finanzas','section-config','section-ventas','section-h1','section-cotizador','section-tarifas'].forEach(id=>{
     const el=document.getElementById(id); if(!el) return;
     const show=id==='section-'+n;
     el.style.display=show?'':'none';
@@ -2605,7 +2654,8 @@ function switchSection(n){
     'ventas':        ['Ventas',          'Comisiones y ranking de vendedores'],
     'h1':            ['Vehículos',       'Tours H1 en tiempo real desde Airtable'],
     'partidos':      ['Partidos',        'River y Boca de local — planificación de tours de estadio'],
-    'cotizador':     ['Cotizador <span style="font-size:10px;font-weight:800;background:var(--teal);color:#060F1E;border-radius:4px;padding:1px 6px;letter-spacing:.5px;vertical-align:middle;margin-left:6px">BETA</span>', 'Armá presupuestos en dólares blue al instante']
+    'cotizador':     ['Cotizador <span style="font-size:10px;font-weight:800;background:var(--teal);color:#060F1E;border-radius:4px;padding:1px 6px;letter-spacing:.5px;vertical-align:middle;margin-left:6px">BETA</span>', 'Armá presupuestos en dólares blue al instante'],
+    'tarifas':       ['Tarifas y Netos', 'Gestión de tarifas, costos y márgenes']
   };
   const t = titles[n] || ['VIARG','Panel administrativo'];
   document.getElementById('topbar-title').innerHTML = t[0];
@@ -2645,6 +2695,7 @@ function switchSection(n){
   if(n==='guias') guiasRender();
   if(n==='ventas') ventasRender();
   if(n==='cotizador') { cotizFetchDolar(); cotizRenderHistorial(); }
+  if(n==='tarifas') tfInit();
   if(n==='h1'){
     if (!state.vehiculos || !state.vehiculos.length) state.vehiculos = ['H1'];
     if (!h1State.vehicle || !state.vehiculos.includes(h1State.vehicle)) h1State.vehicle = state.vehiculos[0];
@@ -4804,7 +4855,8 @@ const _NAV_MODULES = [
   { id:'ventas',         label:'Ventas',          icon:'🛍️' },
   { id:'cotizador',      label:'Cotizador',       icon:'🧮' },
   { id:'h1',             label:'Vehículos',       icon:'🚗' },
-  { id:'config',         label:'Configuración',   icon:'⚙️' }
+  { id:'config',         label:'Configuración',   icon:'⚙️' },
+  { id:'tarifas',        label:'Tarifas',         icon:'💹' }
 ];
 
 function _getNavOrder() {
@@ -8468,5 +8520,9 @@ function cotizLimpiarHistorial() {
   mostrarToast('Historial eliminado');
 }
 </script>
+<script src="modules/tarifas/tarifas-calc.js"></script>
+<script src="modules/tarifas/tarifas-firebase.js"></script>
+<script src="modules/tarifas/tarifas-seed.js"></script>
+<script src="modules/tarifas/tarifas.js"></script>
 </body>
 </html>
