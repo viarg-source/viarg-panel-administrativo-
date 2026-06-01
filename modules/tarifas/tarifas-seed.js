@@ -7,7 +7,6 @@ const TF_SEED_CONFIG = {
     blue_compra: 1410,
     mep: 1435,
     real: 270,
-    sturla: 1415,
     fuente: 'manual',
     actualizadoEn: null
   }

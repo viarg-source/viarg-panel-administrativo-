@@ -19,7 +19,7 @@ async function tfInit() {
   if (!root) return;
 
   // 1. Carga inmediata desde localStorage — sin esperar Firebase
-  const defaultCfg = { tipoCambio: { blue_compra: 1410, mep: 1435, real: 270, sturla: 1415, fuente: 'manual', actualizadoEn: null } };
+  const defaultCfg = { tipoCambio: { blue_compra: 1410, mep: 1435, real: 270, fuente: 'manual', actualizadoEn: null } };
   if (!tfState.config) {
     try { const c = localStorage.getItem('viarg_tf_config'); tfState.config = c ? JSON.parse(c) : defaultCfg; } catch(e) { tfState.config = defaultCfg; }
   }
@@ -30,6 +30,10 @@ async function tfInit() {
     tfState.activeServicioId = tfState.servicios[0].id;
   }
   tfRender(); // renderiza INMEDIATAMENTE con datos locales
+
+  // Fetch live rates on init
+  tfFetchAllRates();
+  setInterval(tfFetchAllRates, 15 * 60 * 1000);
 
   // 2. Luego actualiza desde Firebase en background
   try {
@@ -130,28 +134,21 @@ function tfRenderTCBar(tc) {
       </div>
     </div>
     <div class="tf-tc-card">
-      <div class="tf-tc-label">MEP</div>
+      <div class="tf-tc-label">MEP ${src}</div>
       <div style="display:flex;align-items:center;gap:6px">
         <span style="font-size:14px;color:var(--text3);font-family:'JetBrains Mono',monospace;font-weight:700">$</span>
         <input type="number" class="tf-tc-input" value="${tc.mep||1435}" oninput="tfOnTcEdit('mep',this.value)" onblur="tfSaveTc()">
       </div>
     </div>
     <div class="tf-tc-card">
-      <div class="tf-tc-label">Real BRL</div>
+      <div class="tf-tc-label">Real BRL ${src}</div>
       <div style="display:flex;align-items:center;gap:6px">
         <span style="font-size:14px;color:var(--text3);font-family:'JetBrains Mono',monospace;font-weight:700">$</span>
         <input type="number" class="tf-tc-input" value="${tc.real||270}" oninput="tfOnTcEdit('real',this.value)" onblur="tfSaveTc()">
       </div>
     </div>
-    <div class="tf-tc-card">
-      <div class="tf-tc-label">Sturla</div>
-      <div style="display:flex;align-items:center;gap:6px">
-        <span style="font-size:14px;color:var(--text3);font-family:'JetBrains Mono',monospace;font-weight:700">$</span>
-        <input type="number" class="tf-tc-input" value="${tc.sturla||1415}" oninput="tfOnTcEdit('sturla',this.value)" onblur="tfSaveTc()">
-      </div>
-    </div>
     <div class="tf-tc-card" style="display:flex;align-items:center;justify-content:center;min-width:auto;flex:0 0 auto">
-      <button id="tf-blue-refresh" onclick="tfFetchDolarBlue()" style="padding:8px 14px;border-radius:8px;background:rgba(43,188,204,0.12);color:var(--teal);border:1px solid rgba(43,188,204,0.3);font-size:12px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;display:flex;align-items:center;gap:6px;white-space:nowrap">
+      <button id="tf-blue-refresh" onclick="tfFetchAllRates()" style="padding:8px 14px;border-radius:8px;background:rgba(43,188,204,0.12);color:var(--teal);border:1px solid rgba(43,188,204,0.3);font-size:12px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;display:flex;align-items:center;gap:6px;white-space:nowrap">
         <span id="tf-blue-refresh-icon">&#8635;</span> Actualizar
       </button>
     </div>
@@ -650,32 +647,61 @@ async function tfSave(servicioId) {
   }
 }
 
-// ─── DOLAR BLUE FETCH ──────────────────────────────────────────────────────
+// ─── LIVE RATES FETCH ──────────────────────────────────────────────────────
 
-async function tfFetchDolarBlue() {
+async function tfFetchAllRates() {
   const btn = document.getElementById('tf-blue-refresh');
   const icon = document.getElementById('tf-blue-refresh-icon');
   if (btn) btn.disabled = true;
   if (icon) icon.innerHTML = '<span style="display:inline-block;animation:spin 0.8s linear infinite">&#8635;</span>';
 
+  if (!tfState.config) tfState.config = { tipoCambio: {} };
+  if (!tfState.config.tipoCambio) tfState.config.tipoCambio = {};
+
+  let anySuccess = false;
+  let blueCompra = null;
+
   try {
     const r = await fetch('https://dolarapi.com/v1/dolares/blue');
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const data = await r.json();
-    const compra = data.compra || data.venta;
-    if (!compra) throw new Error('Sin dato');
-    if (!tfState.config) tfState.config = { tipoCambio: {} };
-    if (!tfState.config.tipoCambio) tfState.config.tipoCambio = {};
-    tfState.config.tipoCambio.blue_compra = compra;
+    if (r.ok) {
+      const d = await r.json();
+      blueCompra = d.compra || d.venta;
+      if (blueCompra) { tfState.config.tipoCambio.blue_compra = blueCompra; anySuccess = true; }
+    }
+  } catch(e) {}
+
+  try {
+    const r = await fetch('https://dolarapi.com/v1/dolares/bolsa');
+    if (r.ok) {
+      const d = await r.json();
+      const mep = d.compra || d.venta;
+      if (mep) { tfState.config.tipoCambio.mep = mep; anySuccess = true; }
+    }
+  } catch(e) {}
+
+  try {
+    const r = await fetch('https://open.er-api.com/v6/latest/USD');
+    if (r.ok) {
+      const d = await r.json();
+      const usdToBrl = d.rates && d.rates.BRL;
+      const currentBlue = blueCompra || tfState.config.tipoCambio.blue_compra || 1410;
+      if (usdToBrl && usdToBrl > 0) {
+        tfState.config.tipoCambio.real = Math.round(currentBlue / usdToBrl);
+        anySuccess = true;
+      }
+    }
+  } catch(e) {}
+
+  if (anySuccess) {
     tfState.config.tipoCambio.fuente = 'live';
     tfState.config.tipoCambio.actualizadoEn = new Date().toISOString();
-    await tfFbSetConfig(tfState.config);
-    if (typeof mostrarToast === 'function') mostrarToast('Blue actualizado: $' + compra, 'ok');
+    try { await tfFbSetConfig(tfState.config); } catch(e) {}
+    if (typeof mostrarToast === 'function') mostrarToast('Tipos de cambio actualizados', 'ok');
     tfRender();
-  } catch(e) {
+  } else {
     if (btn) btn.disabled = false;
     if (icon) icon.innerHTML = '&#8635;';
-    if (typeof mostrarToast === 'function') mostrarToast('Error al obtener blue: ' + e.message);
+    if (typeof mostrarToast === 'function') mostrarToast('Error al obtener cotizaciones');
   }
 }
 
