@@ -1138,8 +1138,12 @@ function tfRenameServicio(id, newName) {
 
 function tfGetCatLabels() {
   const base = { tour: 'Tours', show: 'Shows', transfer: 'Transfers' };
-  if (!tfState.config?.categorias) return base;
-  return { ...base, ...tfState.config.categorias };
+  // Once config.categorias is explicitly set (any key), use it exclusively.
+  // This lets the user delete default sections (tour/show/transfer).
+  if (tfState.config?.categorias && Object.keys(tfState.config.categorias).length > 0) {
+    return { ...tfState.config.categorias };
+  }
+  return base;
 }
 
 function tfSaveCatLabel(cat, newLabel) {
