@@ -544,6 +544,10 @@ function tfSetVentasLink(servicioId, ventasServiceId) {
   if (!s) return;
   s.ventasServiceId = ventasServiceId || null;
   tfState.dirty[servicioId] = true;
+  // Auto-save on link change
+  const { id, ...data } = s;
+  tfFbSetServicio(id, data).catch(() => {});
+  if (typeof mostrarToast === 'function') mostrarToast(ventasServiceId ? 'Comisión vinculada' : 'Comisión desvinculada', 'ok');
   tfRender();
 }
 
