@@ -239,6 +239,19 @@ function tfSelectVehiculo(v) {
   tfRender();
 }
 
+// ─── TICKET HELPER ─────────────────────────────────────────────────────────
+// ticketEnabled (bool) controls ON/OFF; ticketARS stores the price.
+// Falls back to ticketARS>0 for legacy data that lacks ticketEnabled.
+function tfEffectiveTicket(svc) {
+  const en = svc.ticketEnabled === true ||
+             (svc.ticketEnabled === undefined && +svc.ticketARS > 0);
+  return en ? (+svc.ticketARS || 0) : 0;
+}
+function tfIsTicketEnabled(svc) {
+  return svc.ticketEnabled === true ||
+         (svc.ticketEnabled === undefined && +svc.ticketARS > 0);
+}
+
 // ─── TABLE SECTION ─────────────────────────────────────────────────────────
 
 function tfRenderTableSection(servicio, tc) {
@@ -247,7 +260,7 @@ function tfRenderTableSection(servicio, tc) {
   const saveBtn = `<button class="tf-save-btn${isDirty?'':' disabled'}" ${isDirty?'':'disabled'} onclick="tfSave('${servicio.id}')">Guardar cambios</button>`;
 
   // ── Ticket (managed in Configuración tab — only used for calculations here)
-  const ticketARS = servicio.ticketARS || 0;
+  const ticketARS = tfEffectiveTicket(servicio);
 
   // ── Ventas commission link selector
   const ventasServs = (typeof state !== 'undefined' ? (state?.ventas?.servicios || []) : []);
@@ -309,7 +322,7 @@ function tfRenderTable(servicio, vehiculoKey, tc) {
   }
   const rows = vehiculoData.tarifas;
   const linked = servicio.ventasServiceId;
-  const ticketARS = servicio.ticketARS || 0;
+  const ticketARS = tfEffectiveTicket(servicio);
 
   const header = `<tr>
     <th style="text-align:center;width:72px">Pax</th>
@@ -366,7 +379,7 @@ function tfRenderTable(servicio, vehiculoKey, tc) {
 function tfRenderVariantesTable(servicio, tc) {
   const variantes = servicio.variantes || [];
   const linked = servicio.ventasServiceId;
-  const ticketARS = servicio.ticketARS || 0;
+  const ticketARS = tfEffectiveTicket(servicio);
 
   const header = `<tr>
     <th style="text-align:left;width:130px">Variante</th>
@@ -462,7 +475,7 @@ function tfRecalcRowDOM(servicioId, vehiculoOVariante, idx) {
   if (!row) return;
 
   // Apply ticket and ventas commission overrides
-  const ticketARS = s.ticketARS || 0;
+  const ticketARS = tfEffectiveTicket(s);
   const ventasCom = s.ventasServiceId ? tfGetVentasComision(s.ventasServiceId, row.pax || 1) : null;
   const rowForCalc = {
     ...row,
@@ -998,8 +1011,8 @@ function tfRenderConfigTab() {
 
   // Sección 2: ticket por persona — siempre visible, acento azul cuando activo
   const ticketRows = servicios.map(s => {
-    const hasTicket = !!(s.ticketARS);
-    const ticketFmt = hasTicket ? Math.round(+s.ticketARS).toLocaleString('es-AR') : '';
+    const hasTicket = tfIsTicketEnabled(s);
+    const ticketFmt = +s.ticketARS > 0 ? Math.round(+s.ticketARS).toLocaleString('es-AR') : '';
     return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;
       background:${hasTicket?'rgba(43,188,204,0.13)':'var(--surface2)'};
       border:1px solid ${hasTicket?'rgba(43,188,204,0.45)':'var(--border)'};
@@ -1043,7 +1056,8 @@ const _tfTicketSave = {};
 function tfToggleTicket(id, checked) {
   const s = tfState.servicios.find(x => x.id === id);
   if (!s) return;
-  s.ticketARS = checked ? (s.ticketARS || 0) : 0;
+  s.ticketEnabled = checked;           // persist enabled state
+  // ticketARS keeps its value so price is preserved when toggling
   tfSaveTicketConfig(id);
   tfRender();
 }
