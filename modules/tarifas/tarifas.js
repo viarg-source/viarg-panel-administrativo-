@@ -88,19 +88,21 @@ function _tfRenderInner(root) {
   const tabs = ['tarifas', 'dashboard'];
   const activeTab = tfState.activeTab || 'tarifas';
 
+  const tabBtn = (key, label) => `<button onclick="tfSetTab('${key}')" style="padding:7px 18px;border-radius:20px;border:1px solid var(--border);background:${activeTab===key?'var(--teal)':'var(--surface2)'};color:${activeTab===key?'#060F1E':'var(--text2)'};font-weight:700;font-size:13px;cursor:pointer;font-family:'Outfit',sans-serif">${label}</button>`;
   root.innerHTML = `
     <div style="margin-bottom:18px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:space-between">
       <div style="display:flex;gap:8px">
-        <button onclick="tfSetTab('tarifas')" style="padding:7px 18px;border-radius:20px;border:1px solid var(--border);background:${activeTab==='tarifas'?'var(--teal)':'var(--surface2)'};color:${activeTab==='tarifas'?'#060F1E':'var(--text2)'};font-weight:700;font-size:13px;cursor:pointer;font-family:'Outfit',sans-serif">Tarifas</button>
-        <button onclick="tfSetTab('dashboard')" style="padding:7px 18px;border-radius:20px;border:1px solid var(--border);background:${activeTab==='dashboard'?'var(--teal)':'var(--surface2)'};color:${activeTab==='dashboard'?'#060F1E':'var(--text2)'};font-weight:700;font-size:13px;cursor:pointer;font-family:'Outfit',sans-serif">Dashboard</button>
+        ${tabBtn('tarifas','Tarifas')}
+        ${tabBtn('dashboard','Dashboard')}
+        ${tabBtn('config','Configuración')}
       </div>
       <button onclick="tfExportExcel()" style="padding:7px 16px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text2);font-weight:600;font-size:12px;cursor:pointer;font-family:'Outfit',sans-serif;display:flex;align-items:center;gap:6px">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
         Exportar XLSX
       </button>
     </div>
-    ${tfRenderTCBar(tc)}
-    ${activeTab === 'tarifas' ? tfRenderTarifasTab(tc) : tfRenderDashboard(tfState.servicios, tc)}
+    ${activeTab !== 'config' ? tfRenderTCBar(tc) : ''}
+    ${activeTab === 'tarifas' ? tfRenderTarifasTab(tc) : activeTab === 'dashboard' ? tfRenderDashboard(tfGetOrderedServicios(), tc) : tfRenderConfigTab()}
   `;
 
   // Re-init chart after render
@@ -158,7 +160,7 @@ function tfRenderTCBar(tc) {
 // ─── TARIFAS TAB ───────────────────────────────────────────────────────────
 
 function tfRenderTarifasTab(tc) {
-  const servicios = tfState.servicios;
+  const servicios = tfGetOrderedServicios();
   if (!servicios.length) {
     return `<div style="text-align:center;padding:48px 0;color:var(--text3)">
       <div style="font-size:36px;margin-bottom:12px">📋</div>
@@ -318,7 +320,7 @@ function tfRenderTable(servicio, vehiculoKey, tc) {
   const ticketARS = servicio.ticketARS || 0;
 
   const header = `<tr>
-    <th style="text-align:center;width:58px">Pax</th>
+    <th style="text-align:center;width:72px">Pax</th>
     <th>USD</th><th>Reales BRL</th>
     <th>Comisión${linked?' 🔗':''}</th>
     <th>Tarifa Guía</th>
@@ -349,7 +351,7 @@ function tfRenderTable(servicio, vehiculoKey, tc) {
       ? `<td class="tf-cell-calc" style="color:var(--teal);font-weight:700">${tfFmtARS(paseoEfectivo)} <span style="font-size:9px;opacity:.55">🎫</span></td>`
       : `<td><input type="number" class="tf-cell-edit" style="width:88px" value="${row.costoPaseoArs}" oninput="tfOnEditCell('${servicio.id}','${vehiculoKey}',${idx},'costoPaseoArs',this.value)"></td>`;
     return `<tr>
-      <td style="text-align:center"><input type="number" class="tf-cell-edit" style="width:48px;text-align:center;font-weight:700" value="${row.pax}" oninput="tfOnEditCell('${servicio.id}','${vehiculoKey}',${idx},'pax',this.value)"></td>
+      <td style="text-align:center"><input type="number" class="tf-cell-edit" style="width:62px;text-align:center;font-weight:700" value="${row.pax}" oninput="tfOnEditCell('${servicio.id}','${vehiculoKey}',${idx},'pax',this.value)"></td>
       <td><input type="number" class="tf-cell-edit" value="${row.usd}" oninput="tfOnEditCell('${servicio.id}','${vehiculoKey}',${idx},'usd',this.value)"></td>
       <td class="tf-cell-calc">${tfFmtBRL(calc.precioReales)}</td>
       ${comCell}
@@ -937,4 +939,124 @@ function tfExportExcel() {
   const date = new Date().toISOString().slice(0,10);
   XLSX.writeFile(wb, `VIARG_Tarifas_${date}.xlsx`);
   if (typeof mostrarToast === 'function') mostrarToast('Excel exportado', 'ok');
+}
+
+// ─── ORDEN DE SERVICIOS ────────────────────────────────────────────────────
+
+function tfGetOrderedServicios() {
+  const order = (tfState.config && tfState.config.serviciosOrder) || [];
+  const all = tfState.servicios;
+  if (!order.length) return all;
+  const result = [];
+  order.forEach(id => { const s = all.find(x => x.id === id); if (s) result.push(s); });
+  all.forEach(s => { if (!order.includes(s.id)) result.push(s); });
+  return result;
+}
+
+function tfMoveServicio(id, cat, dir) {
+  if (!tfState.config) tfState.config = {};
+  const ordered = tfGetOrderedServicios();
+  const currentOrder = ordered.map(s => s.id);
+  const catItems = ordered.filter(s => s.categoria === cat);
+  const catIdx = catItems.findIndex(s => s.id === id);
+  const newCatIdx = catIdx + dir;
+  if (newCatIdx < 0 || newCatIdx >= catItems.length) return;
+  const aPos = currentOrder.indexOf(catItems[catIdx].id);
+  const bPos = currentOrder.indexOf(catItems[newCatIdx].id);
+  [currentOrder[aPos], currentOrder[bPos]] = [currentOrder[bPos], currentOrder[aPos]];
+  tfState.config.serviciosOrder = currentOrder;
+  tfFbSetConfig(tfState.config).catch(() => {});
+  tfRender();
+}
+
+// ─── CONFIGURACIÓN TAB ─────────────────────────────────────────────────────
+
+function tfRenderConfigTab() {
+  const servicios = tfGetOrderedServicios();
+  const cats = ['tour','show','transfer'];
+  const catLabels = { tour: 'Tours', show: 'Shows', transfer: 'Transfers' };
+
+  // Sección 1: orden de paseos
+  let orderRows = '';
+  cats.forEach(cat => {
+    const items = servicios.filter(s => s.categoria === cat);
+    if (!items.length) return;
+    orderRows += `<div style="margin-bottom:14px">
+      <div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">${catLabels[cat]}</div>
+      ${items.map((s, catIdx) => `
+        <div style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:5px">
+          <span style="flex:1;font-size:13px;font-weight:600;color:var(--text)">${s.nombre}</span>
+          <span style="font-size:10px;color:var(--text3);background:var(--surface3);padding:2px 8px;border-radius:20px;white-space:nowrap">${s.duracionHs}hs</span>
+          <div style="display:flex;gap:3px">
+            <button onclick="tfMoveServicio('${s.id}','${cat}',-1)" ${catIdx===0?'disabled':''}
+              style="width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:var(--surface);cursor:${catIdx===0?'default':'pointer'};color:var(--text2);display:flex;align-items:center;justify-content:center;font-size:13px;opacity:${catIdx===0?'.3':'1'}">↑</button>
+            <button onclick="tfMoveServicio('${s.id}','${cat}',1)" ${catIdx===items.length-1?'disabled':''}
+              style="width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:var(--surface);cursor:${catIdx===items.length-1?'default':'pointer'};color:var(--text2);display:flex;align-items:center;justify-content:center;font-size:13px;opacity:${catIdx===items.length-1?'.3':'1'}">↓</button>
+          </div>
+        </div>`).join('')}
+    </div>`;
+  });
+
+  // Sección 2: ticket por persona
+  const ticketRows = servicios.map(s => {
+    const hasTicket = !!(s.ticketARS);
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:${hasTicket?'rgba(43,188,204,0.05)':'var(--surface2)'};border:1px solid ${hasTicket?'rgba(43,188,204,0.3)':'var(--border)'};border-radius:8px;margin-bottom:5px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex:1;min-width:0">
+        <input type="checkbox" ${hasTicket?'checked':''} onchange="tfToggleTicket('${s.id}',this.checked)"
+          style="width:16px;height:16px;accent-color:var(--teal);cursor:pointer;flex-shrink:0">
+        <span style="font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.nombre}</span>
+      </label>
+      ${hasTicket
+        ? `<div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
+            <span style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace">$</span>
+            <input type="number" min="0" value="${s.ticketARS||''}" placeholder="0"
+              oninput="tfSetTicketFromConfig('${s.id}',this.value)"
+              onblur="tfSaveTicketConfig('${s.id}')"
+              style="width:96px;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;padding:4px 8px;border:1px solid rgba(43,188,204,0.4);border-radius:6px;background:var(--surface);color:var(--text);outline:none">
+            <span style="font-size:10px;color:var(--text3);white-space:nowrap">ARS/pax</span>
+          </div>`
+        : `<span style="font-size:11px;color:var(--text3);flex-shrink:0">Sin ticket</span>`}
+    </div>`;
+  }).join('');
+
+  return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">
+      <div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:3px">Orden de visualización</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:14px">Cambiá el orden en que aparecen los paseos en el selector. Se guarda automáticamente.</div>
+      ${orderRows}
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">
+      <div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:3px">🎫 Costo de entrada por persona</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:14px">Activá para los paseos que tengan ticket de entrada. El precio × pax se aplica automáticamente como Costo Paseo en todas las filas.</div>
+      ${ticketRows}
+    </div>
+  </div>`;
+}
+
+// ─── TICKET CONFIG ─────────────────────────────────────────────────────────
+
+const _tfTicketSave = {};
+
+function tfToggleTicket(id, checked) {
+  const s = tfState.servicios.find(x => x.id === id);
+  if (!s) return;
+  s.ticketARS = checked ? (s.ticketARS || 0) : 0;
+  tfSaveTicketConfig(id);
+  tfRender();
+}
+
+function tfSetTicketFromConfig(id, value) {
+  const s = tfState.servicios.find(x => x.id === id);
+  if (!s) return;
+  s.ticketARS = parseFloat(value) || 0;
+}
+
+function tfSaveTicketConfig(id) {
+  clearTimeout(_tfTicketSave[id]);
+  _tfTicketSave[id] = setTimeout(async () => {
+    const s = tfState.servicios.find(x => x.id === id);
+    if (!s) return;
+    const { id: sid, ...data } = s;
+    try { await tfFbSetServicio(sid, data); } catch(e) {}
+  }, 600);
 }
