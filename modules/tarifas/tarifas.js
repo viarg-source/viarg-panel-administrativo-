@@ -180,31 +180,41 @@ function tfRenderTarifasTab(tc) {
   const activeId = tfState.activeServicioId;
   const servicio = servicios.find(s => s.id === activeId) || servicios[0];
 
-  return `
-    ${tfRenderServiceSelector(servicios)}
-    ${tfRenderVehiculoTabs(servicio)}
-    ${tfRenderTableSection(servicio, tc)}
-  `;
+  return `<div style="display:grid;grid-template-columns:190px 1fr;gap:12px;align-items:start">
+    ${tfRenderServiceSidebar(servicios)}
+    <div>
+      ${tfRenderVehiculoTabs(servicio)}
+      ${tfRenderTableSection(servicio, tc)}
+    </div>
+  </div>`;
 }
 
-// ─── SERVICE SELECTOR ──────────────────────────────────────────────────────
+// ─── SERVICE SIDEBAR ───────────────────────────────────────────────────────
 
-function tfRenderServiceSelector(servicios) {
+function tfRenderServiceSidebar(servicios) {
   const catLabels = tfGetCatLabels();
   const cats = Object.keys(catLabels);
-
   let html = '';
   cats.forEach(cat => {
     const items = servicios.filter(s => s.categoria === cat);
     if (!items.length) return;
-    html += `<div style="margin-bottom:12px">
-      <div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">${catLabels[cat]}</div>
-      <div class="tf-service-selector">
-        ${items.map(s => `<button class="tf-service-btn${s.id===tfState.activeServicioId?' active':''}" onclick="tfSelectServicio('${s.id}')">${s.nombre}</button>`).join('')}
-      </div>
+    html += `<div style="margin-bottom:10px">
+      <div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;padding:0 8px;margin-bottom:3px">${catLabels[cat]}</div>
+      ${items.map(s => {
+        const active = s.id === tfState.activeServicioId;
+        return `<button onclick="tfSelectServicio('${s.id}')"
+          style="display:block;width:100%;text-align:left;padding:7px 10px;border-radius:7px;border:none;
+            background:${active?'var(--teal)':'transparent'};
+            color:${active?'#060F1E':'var(--text2)'};
+            font-size:12px;font-weight:${active?'700':'500'};cursor:pointer;font-family:'Outfit',sans-serif;
+            white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+            margin-bottom:1px;transition:background .12s,color .12s">
+          ${s.nombre}
+        </button>`;
+      }).join('')}
     </div>`;
   });
-  return html;
+  return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 6px;position:sticky;top:8px">${html}</div>`;
 }
 
 function tfSelectServicio(id) {
@@ -1010,12 +1020,7 @@ function tfRenderConfigTab() {
           ondragend="tfDragEnd()"
           style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:5px;cursor:grab;user-select:none">
           <span style="color:var(--text3);font-size:16px;flex-shrink:0;line-height:1">⠿</span>
-          <input type="text" draggable="false" value="${s.nombre.replace(/"/g,'&quot;')}"
-            onchange="tfRenameServicio('${s.id}',this.value)"
-            onfocus="this.style.borderBottomColor='var(--teal)'"
-            onblur="this.style.borderBottomColor='transparent'"
-            onclick="event.stopPropagation()"
-            style="flex:1;font-size:13px;font-weight:600;color:var(--text);background:transparent;border:none;border-bottom:1px dashed transparent;outline:none;padding:0 2px;cursor:text;min-width:0">
+          <span style="flex:1;font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">${s.nombre}</span>
           <span style="font-size:10px;color:var(--text3);background:var(--surface3);padding:2px 8px;border-radius:20px;white-space:nowrap;flex-shrink:0">${s.duracionHs}hs</span>
         </div>`).join('')}
     </div>`;
@@ -1050,7 +1055,7 @@ function tfRenderConfigTab() {
   return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">
       <div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:3px">Orden de visualización</div>
-      <div style="font-size:11px;color:var(--text3);margin-bottom:14px">Arrastrá los paseos para reordenarlos. Hacé clic en el nombre para editarlo.</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:14px">Arrastrá para cambiar el orden. Editá nombres en la pestaña <strong>Gestión</strong>.</div>
       ${orderRows}
     </div>
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">
@@ -1162,12 +1167,17 @@ function tfAddNewCategory() {
 
 function tfDeleteCategory(cat) {
   if (tfState.servicios.some(s => s.categoria === cat)) {
-    if (typeof mostrarToast === 'function') mostrarToast('Mové las actividades antes de eliminar la sección');
+    if (typeof mostrarToast === 'function') mostrarToast('Primero mové o eliminá las actividades de esta sección');
     return;
   }
-  if (!tfState.config?.categorias) return;
+  if (!tfState.config) tfState.config = {};
+  // If categorias not yet customized, initialize with all current labels
+  if (!tfState.config.categorias || Object.keys(tfState.config.categorias).length === 0) {
+    tfState.config.categorias = { ...tfGetCatLabels() };
+  }
   delete tfState.config.categorias[cat];
   tfFbSetConfig(tfState.config).catch(() => {});
+  if (typeof mostrarToast === 'function') mostrarToast(`Sección "${cat}" eliminada`);
   tfRender();
 }
 
@@ -1343,19 +1353,23 @@ function tfRenderGestionTab() {
     </div>`;
   });
 
-  // Category management
+  // Category management — key editable + delete any empty section
   const catRows = cats.map(cat => {
-    const isDefault = ['tour','show','transfer'].includes(cat);
     const inUse = servicios.some(s => s.categoria === cat);
-    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:5px">
-      <span style="font-size:10px;color:var(--text3);font-family:'JetBrains Mono',monospace;background:var(--surface3,rgba(0,0,0,.05));padding:2px 6px;border-radius:4px;flex-shrink:0">${cat}</span>
+    const count = servicios.filter(s => s.categoria === cat).length;
+    return `<div style="display:flex;align-items:center;gap:7px;padding:7px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:5px">
+      <input type="text" value="${cat}"
+        onfocus="this.style.outline='1px solid var(--teal)'"
+        onblur="this.style.outline='none';if(this.value&&this.value!=='${cat}')tfRenameCategory('${cat}',this.value)"
+        title="Clave interna — editá para cambiarla"
+        style="font-size:10px;color:var(--text3);font-family:'JetBrains Mono',monospace;background:rgba(0,0,0,.05);padding:2px 6px;border-radius:4px;border:none;outline:none;width:80px;flex-shrink:0;cursor:text">
       <input type="text" value="${(catLabels[cat]||'').replace(/"/g,'&quot;')}"
         onblur="tfSaveCatLabel('${cat}',this.value)"
         onfocus="this.style.borderBottomColor='var(--teal)'"
         style="flex:1;font-size:13px;font-weight:600;color:var(--text);background:transparent;border:none;border-bottom:1px dashed transparent;outline:none;padding:0 3px;cursor:text">
-      ${!isDefault && !inUse
-        ? `<button onclick="tfDeleteCategory('${cat}')" title="Eliminar sección" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:15px;opacity:.6;padding:2px 4px">✕</button>`
-        : (inUse && !isDefault ? `<span style="font-size:10px;color:var(--text3)">${servicios.filter(s=>s.categoria===cat).length} act.</span>` : '')}
+      ${inUse
+        ? `<span style="font-size:10px;color:var(--text3);flex-shrink:0">${count}</span>`
+        : `<button onclick="tfDeleteCategory('${cat}')" title="Eliminar sección" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:15px;opacity:.55;padding:2px 4px;flex-shrink:0">✕</button>`}
     </div>`;
   }).join('');
 
@@ -1393,4 +1407,45 @@ function tfRenderGestionTab() {
         </div>
       </div>
     </div>`;
+}
+
+// ─── RENAME CATEGORY KEY ───────────────────────────────────────────────────
+
+function tfRenameCategory(oldKey, rawNew) {
+  const newKey = (rawNew||'').trim().toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
+  if (!newKey || newKey === oldKey) return;
+
+  if (!tfState.config) tfState.config = {};
+  // Ensure all current labels are persisted before modifying
+  if (!tfState.config.categorias || Object.keys(tfState.config.categorias).length === 0) {
+    tfState.config.categorias = { ...tfGetCatLabels() };
+  }
+  const label = tfState.config.categorias[oldKey] || oldKey;
+  delete tfState.config.categorias[oldKey];
+  tfState.config.categorias[newKey] = label;
+  tfFbSetConfig(tfState.config).catch(() => {});
+
+  // Migrate all services from oldKey → newKey
+  let updatedLocal = false;
+  tfState.servicios.forEach(s => {
+    if (s.categoria !== oldKey) return;
+    s.categoria = newKey;
+    updatedLocal = true;
+    const { id, ...data } = s;
+    tfFbSetServicio(id, data).catch(() => {});
+  });
+
+  // Sync localStorage
+  if (updatedLocal) {
+    try {
+      const arr = JSON.parse(localStorage.getItem('viarg_tf_servicios') || '[]');
+      arr.forEach(x => { if (x.categoria === oldKey) x.categoria = newKey; });
+      localStorage.setItem('viarg_tf_servicios', JSON.stringify(arr));
+    } catch(e) {}
+  }
+
+  if (typeof mostrarToast === 'function') mostrarToast(`Clave "${oldKey}" → "${newKey}"`, 'ok');
+  tfRender();
 }
