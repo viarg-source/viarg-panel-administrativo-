@@ -246,22 +246,8 @@ function tfRenderTableSection(servicio, tc) {
   const isDirty = tfState.dirty[servicio.id];
   const saveBtn = `<button class="tf-save-btn${isDirty?'':' disabled'}" ${isDirty?'':'disabled'} onclick="tfSave('${servicio.id}')">Guardar cambios</button>`;
 
-  // ── Ticket config
+  // ── Ticket (managed in Configuración tab — only used for calculations here)
   const ticketARS = servicio.ticketARS || 0;
-  const ticketHtml = `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;padding:9px 12px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
-    <span style="font-size:11px;font-weight:700;color:var(--text3);white-space:nowrap">🎫 Ticket entrada:</span>
-    <div style="display:flex;align-items:center;gap:5px">
-      <span style="font-size:12px;color:var(--text3);font-family:'JetBrains Mono',monospace">$</span>
-      <input id="tf-ticket-${servicio.id}" type="number" min="0" placeholder="0"
-        value="${ticketARS || ''}"
-        oninput="tfSetTicket('${servicio.id}',this.value)"
-        style="width:110px;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);outline:none">
-      <span style="font-size:11px;color:var(--text3)">ARS/pax</span>
-    </div>
-    ${ticketARS > 0
-      ? `<span style="font-size:11px;color:var(--teal);font-weight:600">→ Costo Paseo = ${new Intl.NumberFormat('es-AR').format(ticketARS)} × pax (automático)</span>`
-      : `<span style="font-size:11px;color:var(--text3)">Configura el costo de entrada por persona — se aplica a todas las filas</span>`}
-  </div>`;
 
   // ── Ventas commission link selector
   const ventasServs = (typeof state !== 'undefined' ? (state?.ventas?.servicios || []) : []);
@@ -281,7 +267,6 @@ function tfRenderTableSection(servicio, tc) {
   if (servicio.variantes && servicio.variantes.length) {
     return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">
       <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:10px">${servicio.nombre} <span style="font-size:11px;font-weight:500;color:var(--text3);margin-left:6px">${servicio.duracionHs}hs</span></div>
-      ${ticketHtml}
       ${ventasLinkHtml}
       ${tfRenderVariantesTable(servicio, tc)}
       ${saveBtn}
@@ -300,7 +285,6 @@ function tfRenderTableSection(servicio, tc) {
 
   return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">
     <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:10px">${servicio.nombre} <span style="font-size:11px;font-weight:500;color:var(--text3);margin-left:6px">${servicio.duracionHs}hs</span></div>
-    ${ticketHtml}
     ${ventasLinkHtml}
     ${tfRenderTable(servicio, tfState.activeVehiculo, tc)}
     ${saveBtn}
@@ -1012,29 +996,29 @@ function tfRenderConfigTab() {
     </div>`;
   });
 
-  // Sección 2: ticket por persona (con formato numérico)
+  // Sección 2: ticket por persona — siempre visible, acento azul cuando activo
   const ticketRows = servicios.map(s => {
     const hasTicket = !!(s.ticketARS);
     const ticketFmt = hasTicket ? Math.round(+s.ticketARS).toLocaleString('es-AR') : '';
-    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:${hasTicket?'rgba(43,188,204,0.05)':'var(--surface2)'};border:1px solid ${hasTicket?'rgba(43,188,204,0.3)':'var(--border)'};border-radius:8px;margin-bottom:5px">
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex:1;min-width:0">
-        <input type="checkbox" ${hasTicket?'checked':''} onchange="tfToggleTicket('${s.id}',this.checked)"
-          style="width:16px;height:16px;accent-color:var(--teal);cursor:pointer;flex-shrink:0">
-        <span style="font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:none">${s.nombre}</span>
-      </label>
-      ${hasTicket
-        ? `<div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
-            <span style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace">$</span>
-            <input type="text" value="${ticketFmt}" placeholder="0"
-              data-raw="${s.ticketARS||0}"
-              onfocus="this.value=this.dataset.raw"
-              onblur="this.value=parseInt(this.dataset.raw||0).toLocaleString('es-AR')"
-              oninput="this.dataset.raw=this.value.replace(/\\./g,'');tfSetTicketFromConfig('${s.id}',this.dataset.raw)"
-              onchange="tfSaveTicketConfig('${s.id}')"
-              style="width:96px;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;padding:4px 8px;border:1px solid rgba(43,188,204,0.4);border-radius:6px;background:var(--surface);color:var(--text);outline:none">
-            <span style="font-size:10px;color:var(--text3);white-space:nowrap">ARS/pax</span>
-          </div>`
-        : `<span style="font-size:11px;color:var(--text3);flex-shrink:0">Sin ticket</span>`}
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;
+      background:${hasTicket?'rgba(43,188,204,0.13)':'var(--surface2)'};
+      border:1px solid ${hasTicket?'rgba(43,188,204,0.45)':'var(--border)'};
+      border-left:4px solid ${hasTicket?'var(--teal)':'transparent'};
+      border-radius:8px;margin-bottom:5px;transition:background .2s,border-color .2s">
+      <input type="checkbox" ${hasTicket?'checked':''} onchange="tfToggleTicket('${s.id}',this.checked)"
+        style="width:16px;height:16px;accent-color:var(--teal);cursor:pointer;flex-shrink:0">
+      <span style="font-size:13px;font-weight:600;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:none">${s.nombre}</span>
+      <div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
+        <span style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace">$</span>
+        <input type="text" value="${ticketFmt}" placeholder="0"
+          data-raw="${s.ticketARS||0}"
+          onfocus="this.value=this.dataset.raw"
+          onblur="this.value=parseInt(this.dataset.raw||0)?parseInt(this.dataset.raw).toLocaleString('es-AR'):''"
+          oninput="this.dataset.raw=this.value.replace(/\\./g,'');tfSetTicketFromConfig('${s.id}',this.dataset.raw)"
+          onchange="tfSaveTicketConfig('${s.id}')"
+          style="width:96px;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;padding:4px 8px;border:1px solid ${hasTicket?'rgba(43,188,204,0.4)':'var(--border)'};border-radius:6px;background:var(--surface);color:var(--text);outline:none">
+        <span style="font-size:10px;color:var(--text3);white-space:nowrap">ARS/pax</span>
+      </div>
     </div>`;
   }).join('');
 
