@@ -307,6 +307,14 @@ function tfRenderTableSection(servicio, tc) {
   </div>`;
 }
 
+// ─── ARS INPUT HELPER ──────────────────────────────────────────────────────
+// Renders an editable integer ARS cell: formatted on display, raw on focus
+function tfArsInput(sId, vKey, idx, field, val, w) {
+  const raw = Math.round(+val || 0);
+  const fmt = raw.toLocaleString('es-AR');
+  return `<input type="text" class="tf-cell-edit" style="width:${w||88}px" value="${fmt}" data-raw="${raw}" onfocus="this.value=this.dataset.raw" onblur="this.value=parseInt(this.dataset.raw||0).toLocaleString('es-AR')" oninput="this.dataset.raw=this.value.replace(/\\./g,'');tfOnEditCell('${sId}','${vKey}',${idx},'${field}',this.dataset.raw)">`;
+}
+
 // ─── MAIN TABLE ────────────────────────────────────────────────────────────
 
 function tfRenderTable(servicio, vehiculoKey, tc) {
@@ -349,7 +357,7 @@ function tfRenderTable(servicio, vehiculoKey, tc) {
       : `<td><input type="number" class="tf-cell-edit" value="${row.comisionUsd}" oninput="tfOnEditCell('${servicio.id}','${vehiculoKey}',${idx},'comisionUsd',this.value)"></td>`;
     const paseoCell = ticketARS > 0
       ? `<td class="tf-cell-calc" style="color:var(--teal);font-weight:700">${tfFmtARS(paseoEfectivo)} <span style="font-size:9px;opacity:.55">🎫</span></td>`
-      : `<td><input type="number" class="tf-cell-edit" style="width:88px" value="${row.costoPaseoArs}" oninput="tfOnEditCell('${servicio.id}','${vehiculoKey}',${idx},'costoPaseoArs',this.value)"></td>`;
+      : `<td>${tfArsInput(servicio.id, vehiculoKey, idx, 'costoPaseoArs', row.costoPaseoArs)}</td>`;
     return `<tr>
       <td style="text-align:center"><input type="number" class="tf-cell-edit" style="width:62px;text-align:center;font-weight:700" value="${row.pax}" oninput="tfOnEditCell('${servicio.id}','${vehiculoKey}',${idx},'pax',this.value)"></td>
       <td><input type="number" class="tf-cell-edit" value="${row.usd}" oninput="tfOnEditCell('${servicio.id}','${vehiculoKey}',${idx},'usd',this.value)"></td>
@@ -357,7 +365,7 @@ function tfRenderTable(servicio, vehiculoKey, tc) {
       ${comCell}
       <td><input type="number" class="tf-cell-edit" value="${row.tarifaGuiaUsd}" oninput="tfOnEditCell('${servicio.id}','${vehiculoKey}',${idx},'tarifaGuiaUsd',this.value)"></td>
       ${paseoCell}
-      <td><input type="number" class="tf-cell-edit" style="width:88px" value="${row.costoTransporteArs}" oninput="tfOnEditCell('${servicio.id}','${vehiculoKey}',${idx},'costoTransporteArs',this.value)"></td>
+      <td>${tfArsInput(servicio.id, vehiculoKey, idx, 'costoTransporteArs', row.costoTransporteArs)}</td>
       <td class="tf-cell-calc">${tfFmtUSD(calc.conversionUsd)}</td>
       <td><span class="${cls}">${tfFmtUSD(calc.gananciaUsd)}</span></td>
       <td><span class="${cls}">${tfFmtPct(calc.margenPct)}</span></td>
@@ -406,7 +414,7 @@ function tfRenderVariantesTable(servicio, tc) {
       : `<td><input type="number" class="tf-cell-edit" value="${row.comisionUsd}" oninput="tfOnEditCell('${servicio.id}','variante',${idx},'comisionUsd',this.value)"></td>`;
     const paseoCell = ticketARS > 0
       ? `<td class="tf-cell-calc" style="color:var(--teal);font-weight:700">${tfFmtARS(paseoEfectivo)} <span style="font-size:9px;opacity:.55">🎫</span></td>`
-      : `<td><input type="number" class="tf-cell-edit" style="width:88px" value="${row.costoPaseoArs}" oninput="tfOnEditCell('${servicio.id}','variante',${idx},'costoPaseoArs',this.value)"></td>`;
+      : `<td>${tfArsInput(servicio.id, 'variante', idx, 'costoPaseoArs', row.costoPaseoArs)}</td>`;
     return `<tr>
       <td><input type="text" class="tf-cell-edit" style="text-align:left;width:120px;font-weight:600" value="${(row.nombre||'').replace(/"/g,'&quot;')}" oninput="tfOnEditVarianteName('${servicio.id}',${idx},this.value)"></td>
       <td><input type="number" class="tf-cell-edit" value="${row.usd}" oninput="tfOnEditCell('${servicio.id}','variante',${idx},'usd',this.value)"></td>
@@ -414,7 +422,7 @@ function tfRenderVariantesTable(servicio, tc) {
       ${comCell}
       <td><input type="number" class="tf-cell-edit" value="${row.tarifaGuiaUsd}" oninput="tfOnEditCell('${servicio.id}','variante',${idx},'tarifaGuiaUsd',this.value)"></td>
       ${paseoCell}
-      <td><input type="number" class="tf-cell-edit" style="width:88px" value="${row.costoTransporteArs}" oninput="tfOnEditCell('${servicio.id}','variante',${idx},'costoTransporteArs',this.value)"></td>
+      <td>${tfArsInput(servicio.id, 'variante', idx, 'costoTransporteArs', row.costoTransporteArs)}</td>
       <td class="tf-cell-calc">${tfFmtUSD(calc.conversionUsd)}</td>
       <td><span class="${cls}">${tfFmtUSD(calc.gananciaUsd)}</span></td>
       <td><span class="${cls}">${tfFmtPct(calc.margenPct)}</span></td>
@@ -432,7 +440,8 @@ function tfRenderVariantesTable(servicio, tc) {
 function tfOnEditCell(servicioId, vehiculoOVariante, idx, campo, value) {
   const s = tfState.servicios.find(x => x.id === servicioId);
   if (!s) return;
-  const v = campo === 'pax' ? (parseInt(value) || 0) : (parseFloat(value) || 0);
+  const rawStr = String(value).replace(/\./g, '').replace(',', '.');
+  const v = campo === 'pax' ? (parseInt(rawStr) || 0) : (parseFloat(rawStr) || 0);
 
   if (vehiculoOVariante === 'variante') {
     if (!s.variantes || !s.variantes[idx]) return;
@@ -976,42 +985,52 @@ function tfRenderConfigTab() {
   const cats = ['tour','show','transfer'];
   const catLabels = { tour: 'Tours', show: 'Shows', transfer: 'Transfers' };
 
-  // Sección 1: orden de paseos
+  // Sección 1: orden con drag & drop + edición de nombre
   let orderRows = '';
   cats.forEach(cat => {
     const items = servicios.filter(s => s.categoria === cat);
     if (!items.length) return;
     orderRows += `<div style="margin-bottom:14px">
       <div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">${catLabels[cat]}</div>
-      ${items.map((s, catIdx) => `
-        <div style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:5px">
-          <span style="flex:1;font-size:13px;font-weight:600;color:var(--text)">${s.nombre}</span>
-          <span style="font-size:10px;color:var(--text3);background:var(--surface3);padding:2px 8px;border-radius:20px;white-space:nowrap">${s.duracionHs}hs</span>
-          <div style="display:flex;gap:3px">
-            <button onclick="tfMoveServicio('${s.id}','${cat}',-1)" ${catIdx===0?'disabled':''}
-              style="width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:var(--surface);cursor:${catIdx===0?'default':'pointer'};color:var(--text2);display:flex;align-items:center;justify-content:center;font-size:13px;opacity:${catIdx===0?'.3':'1'}">↑</button>
-            <button onclick="tfMoveServicio('${s.id}','${cat}',1)" ${catIdx===items.length-1?'disabled':''}
-              style="width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:var(--surface);cursor:${catIdx===items.length-1?'default':'pointer'};color:var(--text2);display:flex;align-items:center;justify-content:center;font-size:13px;opacity:${catIdx===items.length-1?'.3':'1'}">↓</button>
-          </div>
+      ${items.map(s => `
+        <div draggable="true"
+          ondragstart="tfDragStart('${s.id}','${cat}')"
+          ondragover="event.preventDefault();this.style.outline='2px solid var(--teal)'"
+          ondragleave="this.style.outline='none'"
+          ondrop="this.style.outline='none';tfDrop('${s.id}','${cat}')"
+          ondragend="tfDragEnd()"
+          style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:5px;cursor:grab;user-select:none">
+          <span style="color:var(--text3);font-size:16px;flex-shrink:0;line-height:1">⠿</span>
+          <input type="text" draggable="false" value="${s.nombre.replace(/"/g,'&quot;')}"
+            onchange="tfRenameServicio('${s.id}',this.value)"
+            onfocus="this.style.borderBottomColor='var(--teal)'"
+            onblur="this.style.borderBottomColor='transparent'"
+            onclick="event.stopPropagation()"
+            style="flex:1;font-size:13px;font-weight:600;color:var(--text);background:transparent;border:none;border-bottom:1px dashed transparent;outline:none;padding:0 2px;cursor:text;min-width:0">
+          <span style="font-size:10px;color:var(--text3);background:var(--surface3);padding:2px 8px;border-radius:20px;white-space:nowrap;flex-shrink:0">${s.duracionHs}hs</span>
         </div>`).join('')}
     </div>`;
   });
 
-  // Sección 2: ticket por persona
+  // Sección 2: ticket por persona (con formato numérico)
   const ticketRows = servicios.map(s => {
     const hasTicket = !!(s.ticketARS);
+    const ticketFmt = hasTicket ? Math.round(+s.ticketARS).toLocaleString('es-AR') : '';
     return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:${hasTicket?'rgba(43,188,204,0.05)':'var(--surface2)'};border:1px solid ${hasTicket?'rgba(43,188,204,0.3)':'var(--border)'};border-radius:8px;margin-bottom:5px">
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex:1;min-width:0">
         <input type="checkbox" ${hasTicket?'checked':''} onchange="tfToggleTicket('${s.id}',this.checked)"
           style="width:16px;height:16px;accent-color:var(--teal);cursor:pointer;flex-shrink:0">
-        <span style="font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.nombre}</span>
+        <span style="font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:none">${s.nombre}</span>
       </label>
       ${hasTicket
         ? `<div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
             <span style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace">$</span>
-            <input type="number" min="0" value="${s.ticketARS||''}" placeholder="0"
-              oninput="tfSetTicketFromConfig('${s.id}',this.value)"
-              onblur="tfSaveTicketConfig('${s.id}')"
+            <input type="text" value="${ticketFmt}" placeholder="0"
+              data-raw="${s.ticketARS||0}"
+              onfocus="this.value=this.dataset.raw"
+              onblur="this.value=parseInt(this.dataset.raw||0).toLocaleString('es-AR')"
+              oninput="this.dataset.raw=this.value.replace(/\\./g,'');tfSetTicketFromConfig('${s.id}',this.dataset.raw)"
+              onchange="tfSaveTicketConfig('${s.id}')"
               style="width:96px;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;padding:4px 8px;border:1px solid rgba(43,188,204,0.4);border-radius:6px;background:var(--surface);color:var(--text);outline:none">
             <span style="font-size:10px;color:var(--text3);white-space:nowrap">ARS/pax</span>
           </div>`
@@ -1022,7 +1041,7 @@ function tfRenderConfigTab() {
   return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">
       <div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:3px">Orden de visualización</div>
-      <div style="font-size:11px;color:var(--text3);margin-bottom:14px">Cambiá el orden en que aparecen los paseos en el selector. Se guarda automáticamente.</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:14px">Arrastrá los paseos para reordenarlos. Hacé clic en el nombre para editarlo.</div>
       ${orderRows}
     </div>
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">
@@ -1048,7 +1067,7 @@ function tfToggleTicket(id, checked) {
 function tfSetTicketFromConfig(id, value) {
   const s = tfState.servicios.find(x => x.id === id);
   if (!s) return;
-  s.ticketARS = parseFloat(value) || 0;
+  s.ticketARS = parseFloat(String(value).replace(/\./g, '').replace(',', '.')) || 0;
 }
 
 function tfSaveTicketConfig(id) {
@@ -1059,4 +1078,39 @@ function tfSaveTicketConfig(id) {
     const { id: sid, ...data } = s;
     try { await tfFbSetServicio(sid, data); } catch(e) {}
   }, 600);
+}
+
+// ─── DRAG & DROP ───────────────────────────────────────────────────────────
+
+let _tfDrag = { id: null, cat: null };
+
+function tfDragStart(id, cat) { _tfDrag = { id, cat }; }
+function tfDragEnd() { _tfDrag = { id: null, cat: null }; }
+
+function tfDrop(id, cat) {
+  if (!_tfDrag.id || _tfDrag.cat !== cat || _tfDrag.id === id) {
+    _tfDrag = { id: null, cat: null };
+    return;
+  }
+  if (!tfState.config) tfState.config = {};
+  const ordered = tfGetOrderedServicios();
+  const currentOrder = ordered.map(s => s.id);
+  const aPos = currentOrder.indexOf(_tfDrag.id);
+  const bPos = currentOrder.indexOf(id);
+  if (aPos >= 0 && bPos >= 0) {
+    [currentOrder[aPos], currentOrder[bPos]] = [currentOrder[bPos], currentOrder[aPos]];
+    tfState.config.serviciosOrder = currentOrder;
+    tfFbSetConfig(tfState.config).catch(() => {});
+  }
+  _tfDrag = { id: null, cat: null };
+  tfRender();
+}
+
+// ─── RENAME SERVICIO ───────────────────────────────────────────────────────
+
+function tfRenameServicio(id, newName) {
+  const s = tfState.servicios.find(x => x.id === id);
+  if (!s || !newName.trim()) return;
+  s.nombre = newName.trim();
+  tfSaveTicketConfig(id);
 }

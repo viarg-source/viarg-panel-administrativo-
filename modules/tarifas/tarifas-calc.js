@@ -24,7 +24,7 @@ function tarifasMargenColor(margenPct, gananciaUsd) {
   return 'red';
 }
 
-function tfFmtUSD(v) { return (+v).toFixed(2); }
+function tfFmtUSD(v) { return (+v).toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2}); }
 function tfFmtARS(v) { return Math.round(+v).toLocaleString('es-AR'); }
-function tfFmtBRL(v) { return (+v).toFixed(2); }
+function tfFmtBRL(v) { return (+v).toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2}); }
 function tfFmtPct(v) { return (v * 100).toFixed(1) + '%'; }
