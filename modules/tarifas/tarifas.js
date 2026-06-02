@@ -12,6 +12,8 @@ let tfState = {
   chart: null
 };
 
+let _tfGestionModal = { open: false, mode: 'add', svcId: null };
+
 // ─── INIT ──────────────────────────────────────────────────────────────────
 
 async function tfInit() {
@@ -89,20 +91,26 @@ function _tfRenderInner(root) {
   const activeTab = tfState.activeTab || 'tarifas';
 
   const tabBtn = (key, label) => `<button onclick="tfSetTab('${key}')" style="padding:7px 18px;border-radius:20px;border:1px solid var(--border);background:${activeTab===key?'var(--teal)':'var(--surface2)'};color:${activeTab===key?'#060F1E':'var(--text2)'};font-weight:700;font-size:13px;cursor:pointer;font-family:'Outfit',sans-serif">${label}</button>`;
+  const showTCBar = activeTab === 'tarifas' || activeTab === 'dashboard';
   root.innerHTML = `
     <div style="margin-bottom:18px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:space-between">
-      <div style="display:flex;gap:8px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
         ${tabBtn('tarifas','Tarifas')}
         ${tabBtn('dashboard','Dashboard')}
         ${tabBtn('config','Configuración')}
+        ${tabBtn('gestion','Gestión')}
       </div>
       <button onclick="tfExportExcel()" style="padding:7px 16px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text2);font-weight:600;font-size:12px;cursor:pointer;font-family:'Outfit',sans-serif;display:flex;align-items:center;gap:6px">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
         Exportar XLSX
       </button>
     </div>
-    ${activeTab !== 'config' ? tfRenderTCBar(tc) : ''}
-    ${activeTab === 'tarifas' ? tfRenderTarifasTab(tc) : activeTab === 'dashboard' ? tfRenderDashboard(tfGetOrderedServicios(), tc) : tfRenderConfigTab()}
+    ${showTCBar ? tfRenderTCBar(tc) : ''}
+    ${activeTab === 'tarifas'   ? tfRenderTarifasTab(tc) :
+      activeTab === 'dashboard' ? tfRenderDashboard(tfGetOrderedServicios(), tc) :
+      activeTab === 'config'    ? tfRenderConfigTab() :
+                                  tfRenderGestionTab()}
+    ${tfRenderServiceModal()}
   `;
 
   // Re-init chart after render
@@ -182,8 +190,8 @@ function tfRenderTarifasTab(tc) {
 // ─── SERVICE SELECTOR ──────────────────────────────────────────────────────
 
 function tfRenderServiceSelector(servicios) {
-  const cats = ['tour','show','transfer'];
-  const catLabels = { tour: 'Tours', show: 'Shows', transfer: 'Transfers' };
+  const catLabels = tfGetCatLabels();
+  const cats = Object.keys(catLabels);
 
   let html = '';
   cats.forEach(cat => {
@@ -979,8 +987,8 @@ function tfMoveServicio(id, cat, dir) {
 
 function tfRenderConfigTab() {
   const servicios = tfGetOrderedServicios();
-  const cats = ['tour','show','transfer'];
-  const catLabels = { tour: 'Tours', show: 'Shows', transfer: 'Transfers' };
+  const catLabels = tfGetCatLabels();
+  const cats = Object.keys(catLabels);
 
   // Sección 1: orden con drag & drop + edición de nombre
   let orderRows = '';
@@ -1111,4 +1119,274 @@ function tfRenameServicio(id, newName) {
   if (!s || !newName.trim()) return;
   s.nombre = newName.trim();
   tfSaveTicketConfig(id);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GESTIÓN: CATEGORÍAS + CRUD DE SERVICIOS
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ─── CAT LABELS ────────────────────────────────────────────────────────────
+
+function tfGetCatLabels() {
+  const base = { tour: 'Tours', show: 'Shows', transfer: 'Transfers' };
+  if (!tfState.config?.categorias) return base;
+  return { ...base, ...tfState.config.categorias };
+}
+
+function tfSaveCatLabel(cat, newLabel) {
+  if (!newLabel?.trim()) return;
+  if (!tfState.config) tfState.config = {};
+  if (!tfState.config.categorias) tfState.config.categorias = {};
+  tfState.config.categorias[cat] = newLabel.trim();
+  tfFbSetConfig(tfState.config).catch(() => {});
+  tfRender();
+}
+
+function tfAddNewCategory() {
+  const keyEl = document.getElementById('tf-new-cat-key');
+  const lblEl = document.getElementById('tf-new-cat-label');
+  const key = (keyEl?.value || '').trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+  const label = (lblEl?.value || '').trim();
+  if (!key || !label) { if (typeof mostrarToast === 'function') mostrarToast('Ingresá clave y nombre'); return; }
+  if (!tfState.config) tfState.config = {};
+  if (!tfState.config.categorias) tfState.config.categorias = {};
+  tfState.config.categorias[key] = label;
+  tfFbSetConfig(tfState.config).catch(() => {});
+  if (typeof mostrarToast === 'function') mostrarToast(`Sección "${label}" creada`, 'ok');
+  tfRender();
+}
+
+function tfDeleteCategory(cat) {
+  if (tfState.servicios.some(s => s.categoria === cat)) {
+    if (typeof mostrarToast === 'function') mostrarToast('Mové las actividades antes de eliminar la sección');
+    return;
+  }
+  if (!tfState.config?.categorias) return;
+  delete tfState.config.categorias[cat];
+  tfFbSetConfig(tfState.config).catch(() => {});
+  tfRender();
+}
+
+function tfShowNewCatForm() {
+  const f = document.getElementById('tf-new-cat-form');
+  if (f) f.style.display = f.style.display === 'none' ? 'flex' : 'none';
+}
+
+// ─── SERVICE MODAL ─────────────────────────────────────────────────────────
+
+function tfOpenServiceModal(mode, id) {
+  _tfGestionModal = { open: true, mode, svcId: id || null };
+  tfRender();
+}
+
+function tfCloseServiceModal() {
+  _tfGestionModal = { open: false, mode: 'add', svcId: null };
+  tfRender();
+}
+
+function tfRenderServiceModal() {
+  if (!_tfGestionModal.open) return '';
+  const isEdit = _tfGestionModal.mode === 'edit';
+  const svc = isEdit ? tfState.servicios.find(s => s.id === _tfGestionModal.svcId) : null;
+  const catLabels = tfGetCatLabels();
+  const cats = Object.keys(catLabels);
+
+  const nombre  = (svc?.nombre || '').replace(/"/g, '&quot;');
+  const cat     = svc?.categoria || cats[0] || 'tour';
+  const dur     = svc?.duracionHs || 4;
+  const tipo    = (svc?.variantes?.length > 0 || (svc && !svc.vehiculos)) ? 'variantes' : 'vehiculos';
+
+  const tipoSection = !isEdit ? `
+    <div>
+      <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Tipo de tarifas</div>
+      <div style="display:flex;gap:8px">
+        <label style="flex:1;display:flex;align-items:center;gap:6px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;cursor:pointer">
+          <input type="radio" name="tf-modal-tipo" value="vehiculos" checked style="accent-color:var(--teal)">
+          <span style="font-size:12px;font-weight:600;color:var(--text);text-transform:none">Por cantidad de pax</span>
+        </label>
+        <label style="flex:1;display:flex;align-items:center;gap:6px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;cursor:pointer">
+          <input type="radio" name="tf-modal-tipo" value="variantes" style="accent-color:var(--teal)">
+          <span style="font-size:12px;font-weight:600;color:var(--text);text-transform:none">Por variante</span>
+        </label>
+      </div>
+    </div>` : '';
+
+  return `<div onclick="if(event.target===this)tfCloseServiceModal()"
+    style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(3px)">
+    <div onclick="event.stopPropagation()"
+      style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;width:100%;max-width:440px;box-shadow:0 16px 48px rgba(0,0,0,0.3);font-family:'Outfit',sans-serif">
+      <div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:18px">${isEdit ? '✏ Editar actividad' : '+ Nueva actividad'}</div>
+      <div style="display:flex;flex-direction:column;gap:13px">
+        <div>
+          <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Nombre</div>
+          <input type="text" id="tf-modal-nombre" value="${nombre}" placeholder="Nombre de la actividad"
+            style="width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:7px;background:var(--surface2,var(--surface));color:var(--text);font-size:13px;font-family:'Outfit',sans-serif;outline:none">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Categoría / Sección</div>
+            <select id="tf-modal-cat"
+              style="width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:7px;background:var(--surface2,var(--surface));color:var(--text);font-size:13px;font-family:'Outfit',sans-serif;outline:none">
+              ${cats.map(c => `<option value="${c}"${c===cat?' selected':''}>${catLabels[c]}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Duración (hs)</div>
+            <input type="number" id="tf-modal-dur" value="${dur}" min="0.5" step="0.5"
+              style="width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:7px;background:var(--surface2,var(--surface));color:var(--text);font-size:13px;font-family:'JetBrains Mono',monospace;outline:none">
+          </div>
+        </div>
+        ${tipoSection}
+      </div>
+      <div style="display:flex;gap:10px;margin-top:18px">
+        <button onclick="tfSaveServiceModal()"
+          style="flex:2;padding:10px;border-radius:8px;background:var(--teal);color:#060F1E;border:none;font-size:13px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif">
+          ${isEdit ? 'Guardar cambios' : 'Crear actividad'}
+        </button>
+        <button onclick="tfCloseServiceModal()"
+          style="flex:1;padding:10px;border-radius:8px;background:transparent;color:var(--text3);border:1px solid var(--border);font-size:13px;cursor:pointer;font-family:'Outfit',sans-serif">
+          Cancelar
+        </button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function tfSaveServiceModal() {
+  const nombre = (document.getElementById('tf-modal-nombre')?.value || '').trim();
+  const cat    = document.getElementById('tf-modal-cat')?.value || 'tour';
+  const dur    = parseFloat(document.getElementById('tf-modal-dur')?.value) || 1;
+  if (!nombre) { if (typeof mostrarToast === 'function') mostrarToast('Ingresá un nombre'); return; }
+
+  if (_tfGestionModal.mode === 'edit') {
+    const s = tfState.servicios.find(x => x.id === _tfGestionModal.svcId);
+    if (!s) return;
+    s.nombre = nombre; s.categoria = cat; s.duracionHs = dur;
+    const { id, ...data } = s;
+    tfFbSetServicio(id, data).catch(() => {});
+    if (typeof mostrarToast === 'function') mostrarToast('Actividad actualizada', 'ok');
+  } else {
+    const tipo = document.querySelector('input[name="tf-modal-tipo"]:checked')?.value || 'vehiculos';
+    const slug = nombre.normalize('NFD').replace(/[̀-ͯ]/g,'')
+      .toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0,28);
+    const id = slug + '_' + Date.now().toString(36).slice(-4);
+    const newSvc = {
+      id, nombre, categoria: cat, duracionHs: dur,
+      ...(tipo === 'variantes'
+        ? { vehiculos: {}, variantes: [] }
+        : { vehiculos: { auto:{activo:true,tarifas:[]}, van:{activo:false,tarifas:[]}, minibus:{activo:false,tarifas:[]} } })
+    };
+    tfState.servicios.push(newSvc);
+    const { id: sid, ...data } = newSvc;
+    tfFbSetServicio(sid, data).catch(() => {});
+    if (typeof mostrarToast === 'function') mostrarToast(`"${nombre}" creada`, 'ok');
+  }
+  tfCloseServiceModal();
+}
+
+async function tfDeleteServicio(id) {
+  const s = tfState.servicios.find(x => x.id === id);
+  if (!s) return;
+  if (!confirm(`¿Eliminar "${s.nombre}"?\nEsta acción no se puede deshacer.`)) return;
+  tfState.servicios = tfState.servicios.filter(x => x.id !== id);
+  if (tfState.config?.serviciosOrder)
+    tfState.config.serviciosOrder = tfState.config.serviciosOrder.filter(x => x !== id);
+  tfFbSetConfig(tfState.config || {}).catch(() => {});
+  // Delete from Firebase (set to null — works for RTDB and most wrappers)
+  try { if (window._tfSetServicio) await window._tfSetServicio(id, null); } catch(e) {}
+  // Update localStorage
+  try {
+    const arr = JSON.parse(localStorage.getItem('viarg_tf_servicios') || '[]');
+    localStorage.setItem('viarg_tf_servicios', JSON.stringify(arr.filter(x => x.id !== id)));
+  } catch(e) {}
+  if (typeof mostrarToast === 'function') mostrarToast(`"${s.nombre}" eliminada`);
+  if (tfState.activeServicioId === id) tfState.activeServicioId = tfState.servicios[0]?.id || null;
+  tfRender();
+}
+
+// ─── GESTIÓN TAB ───────────────────────────────────────────────────────────
+
+function tfRenderGestionTab() {
+  const servicios = tfGetOrderedServicios();
+  const catLabels = tfGetCatLabels();
+  const cats = Object.keys(catLabels);
+
+  // Service list
+  let svcRows = '';
+  cats.forEach(cat => {
+    const items = servicios.filter(s => s.categoria === cat);
+    svcRows += `<div style="margin-bottom:18px">
+      <div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:7px">${catLabels[cat]}</div>
+      ${items.length === 0
+        ? `<div style="font-size:11px;color:var(--text3);padding:6px 0;font-style:italic">Sin actividades</div>`
+        : items.map(s => {
+            const tipo = s.variantes?.length > 0 ? 'Variantes' : 'Por pax';
+            return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:6px">
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.nombre}</div>
+                <div style="font-size:11px;color:var(--text3);margin-top:1px">${s.duracionHs}hs · ${tipo}</div>
+              </div>
+              <button onclick="tfOpenServiceModal('edit','${s.id}')"
+                style="padding:5px 11px;border-radius:6px;background:rgba(43,188,204,0.1);color:var(--teal);border:1px solid rgba(43,188,204,0.3);font-size:12px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;white-space:nowrap">
+                ✏ Editar
+              </button>
+              <button onclick="tfDeleteServicio('${s.id}')"
+                style="padding:5px 9px;border-radius:6px;background:rgba(217,32,32,0.08);color:var(--red);border:1px solid rgba(217,32,32,0.2);font-size:13px;cursor:pointer;white-space:nowrap">
+                🗑
+              </button>
+            </div>`;
+          }).join('')}
+    </div>`;
+  });
+
+  // Category management
+  const catRows = cats.map(cat => {
+    const isDefault = ['tour','show','transfer'].includes(cat);
+    const inUse = servicios.some(s => s.categoria === cat);
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:5px">
+      <span style="font-size:10px;color:var(--text3);font-family:'JetBrains Mono',monospace;background:var(--surface3,rgba(0,0,0,.05));padding:2px 6px;border-radius:4px;flex-shrink:0">${cat}</span>
+      <input type="text" value="${(catLabels[cat]||'').replace(/"/g,'&quot;')}"
+        onblur="tfSaveCatLabel('${cat}',this.value)"
+        onfocus="this.style.borderBottomColor='var(--teal)'"
+        style="flex:1;font-size:13px;font-weight:600;color:var(--text);background:transparent;border:none;border-bottom:1px dashed transparent;outline:none;padding:0 3px;cursor:text">
+      ${!isDefault && !inUse
+        ? `<button onclick="tfDeleteCategory('${cat}')" title="Eliminar sección" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:15px;opacity:.6;padding:2px 4px">✕</button>`
+        : (inUse && !isDefault ? `<span style="font-size:10px;color:var(--text3)">${servicios.filter(s=>s.categoria===cat).length} act.</span>` : '')}
+    </div>`;
+  }).join('');
+
+  return `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+      <button onclick="tfOpenServiceModal('add',null)"
+        style="padding:8px 18px;border-radius:8px;background:var(--teal);color:#060F1E;border:none;font-size:13px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;display:flex;align-items:center;gap:7px">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Nueva actividad
+      </button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 280px;gap:16px;align-items:start">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px">
+        <div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:3px">Actividades</div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:16px">Agregá, editá o eliminá actividades del catálogo.</div>
+        ${svcRows}
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px">
+        <div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:3px">Secciones</div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:14px">Renombrá haciendo clic en el nombre. Las secciones vacías se pueden eliminar.</div>
+        ${catRows}
+        <button onclick="tfShowNewCatForm()"
+          style="display:flex;align-items:center;gap:6px;width:100%;margin-top:6px;background:rgba(43,188,204,0.08);color:var(--teal);border:1px dashed rgba(43,188,204,0.3);border-radius:7px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif">
+          + Nueva sección
+        </button>
+        <div id="tf-new-cat-form" style="display:none;margin-top:10px;flex-direction:column;gap:7px">
+          <input type="text" id="tf-new-cat-key" placeholder="clave (ej: cruceros)"
+            style="padding:7px 9px;border:1px solid var(--border);border-radius:6px;background:var(--surface2,var(--surface));color:var(--text);font-size:12px;font-family:'JetBrains Mono',monospace;outline:none">
+          <input type="text" id="tf-new-cat-label" placeholder="Nombre visible (ej: Cruceros)"
+            style="padding:7px 9px;border:1px solid var(--border);border-radius:6px;background:var(--surface2,var(--surface));color:var(--text);font-size:12px;font-family:'Outfit',sans-serif;outline:none">
+          <button onclick="tfAddNewCategory()"
+            style="padding:7px 14px;border-radius:6px;background:var(--teal);color:#060F1E;border:none;font-size:12px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif">
+            Crear sección
+          </button>
+        </div>
+      </div>
+    </div>`;
 }
