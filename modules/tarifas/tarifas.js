@@ -317,6 +317,7 @@ function tfRenderTableSection(servicio, tc) {
   return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">
     <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:10px">${servicio.nombre} <span style="font-size:11px;font-weight:500;color:var(--text3);margin-left:6px">${servicio.duracionHs}hs</span></div>
     ${ventasLinkHtml}
+    ${tfRenderCapacidadRow(servicio, tfState.activeVehiculo)}
     ${tfRenderTable(servicio, tfState.activeVehiculo, tc)}
     ${saveBtn}
   </div>`;
@@ -1452,4 +1453,54 @@ function tfRenameCategory(oldKey, rawNew) {
 
   if (typeof mostrarToast === 'function') mostrarToast(`Clave "${oldKey}" → "${newKey}"`, 'ok');
   tfRender();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CAPACIDAD DE VEHÍCULOS
+// ═══════════════════════════════════════════════════════════════════════════
+
+const _tfCapSave = {};
+function tfSaveCapacidadDebounced(id) {
+  clearTimeout(_tfCapSave[id]);
+  _tfCapSave[id] = setTimeout(async () => {
+    const s = tfState.servicios.find(x => x.id === id);
+    if (!s) return;
+    const { id: sid, ...data } = s;
+    try { await tfFbSetServicio(sid, data); } catch(e) {}
+  }, 700);
+}
+
+function tfOnEditCapacidad(svcId, vKey, field, value) {
+  const s = tfState.servicios.find(x => x.id === svcId);
+  if (!s?.vehiculos?.[vKey]) return;
+  if (!s.vehiculos[vKey].capacidad) s.vehiculos[vKey].capacidad = {};
+  const v = parseInt(value);
+  s.vehiculos[vKey].capacidad[field] = isNaN(v) || v < 0 ? null : v;
+  tfSaveCapacidadDebounced(svcId);
+}
+
+function tfRenderCapacidadRow(servicio, vehiculoKey) {
+  const veh = servicio?.vehiculos?.[vehiculoKey];
+  if (!veh?.activo) return '';
+  const cap = veh.capacidad || {};
+  const sid = servicio.id;
+
+  const inp = (icon, key, label) => {
+    const val = cap[key] != null ? cap[key] : '';
+    return `<div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
+      <span style="font-size:15px;line-height:1">${icon}</span>
+      <input type="number" min="0" placeholder="—" value="${val}"
+        oninput="tfOnEditCapacidad('${sid}','${vehiculoKey}','${key}',this.value)"
+        style="width:42px;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;padding:3px 5px;border:1px solid var(--border);border-radius:5px;background:var(--surface);color:var(--text);outline:none;text-align:center">
+      <span style="font-size:10px;color:var(--text3);white-space:nowrap">${label}</span>
+    </div>`;
+  };
+
+  return `<div style="display:flex;align-items:center;gap:14px;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:10px;flex-wrap:wrap">
+    <span style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;flex-shrink:0">Capacidad</span>
+    ${inp('👥','personas','pax')}
+    ${inp('🧳','maletas','× 23kg')}
+    ${inp('💼','carry_on','× 12kg')}
+    ${inp('🎒','mochilas','mochila')}
+  </div>`;
 }
