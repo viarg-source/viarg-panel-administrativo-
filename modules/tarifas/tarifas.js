@@ -184,6 +184,7 @@ function tfRenderTarifasTab(tc) {
     ${tfRenderServiceSidebar(servicios)}
     <div>
       ${tfRenderVehiculoTabs(servicio)}
+      ${tfRenderCapacidadRow(servicio, tfState.activeVehiculo)}
       ${tfRenderTableSection(servicio, tc)}
     </div>
   </div>`;
@@ -317,7 +318,6 @@ function tfRenderTableSection(servicio, tc) {
   return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">
     <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:10px">${servicio.nombre} <span style="font-size:11px;font-weight:500;color:var(--text3);margin-left:6px">${servicio.duracionHs}hs</span></div>
     ${ventasLinkHtml}
-    ${tfRenderCapacidadRow(servicio, tfState.activeVehiculo)}
     ${tfRenderTable(servicio, tfState.activeVehiculo, tc)}
     ${saveBtn}
   </div>`;
