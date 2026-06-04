@@ -2351,6 +2351,8 @@ body.sb-collapsed .sidebar:not(:hover) .sidebar-footer-btns { flex-direction: co
       </div>
       <!-- Vehicle tabs -->
       <div class="h1-vehicle-tabs" id="h1-vehicle-tabs"></div>
+      <!-- Vehicle capacity -->
+      <div id="h1-capacidad" style="margin-bottom:12px"></div>
       <!-- Month navigator -->
       <div class="h1-toolbar">
         <button class="h1-nav-btn" onclick="h1PrevMonth()">&#8592;</button>
@@ -6608,6 +6610,47 @@ function h1RenderTabs() {
       <button class="btn btn-outline btn-sm" onclick="h1HideAddVehicle()">×</button>
     </div>` : '';
   el.innerHTML = tabs + addPart;
+  h1RenderCapacidad();
+}
+
+let _h1CapSaveTimer = null;
+
+function h1RenderCapacidad() {
+  const el = document.getElementById('h1-capacidad');
+  if (!el) return;
+  const v = h1State.vehicle;
+  if (!v) { el.innerHTML = ''; return; }
+  const cap = (state.vehiculosCapacidad && state.vehiculosCapacidad[v]) || {};
+
+  const inp = (icon, key, label) => {
+    const val = cap[key] != null ? cap[key] : '';
+    return `<div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
+      <span style="font-size:15px;line-height:1">${icon}</span>
+      <input type="number" min="0" placeholder="—" value="${val}"
+        onchange="h1OnEditCapacidad('${key}',this.value)"
+        style="width:44px;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);outline:none;text-align:center">
+      <span style="font-size:10px;color:var(--text3);white-space:nowrap">${label}</span>
+    </div>`;
+  };
+
+  el.innerHTML = `<div style="display:inline-flex;align-items:center;gap:14px;padding:8px 14px;background:var(--surface);border:1px solid var(--border-light);border-radius:10px;flex-wrap:wrap">
+    <span style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;flex-shrink:0">Capacidad</span>
+    ${inp('👥','personas','pax')}
+    ${inp('🧳','maletas','× 23kg')}
+    ${inp('💼','carry_on','× 12kg')}
+    ${inp('🎒','mochilas','mochila')}
+  </div>`;
+}
+
+function h1OnEditCapacidad(field, value) {
+  const v = h1State.vehicle;
+  if (!v) return;
+  if (!state.vehiculosCapacidad) state.vehiculosCapacidad = {};
+  if (!state.vehiculosCapacidad[v]) state.vehiculosCapacidad[v] = {};
+  const n = parseInt(value);
+  state.vehiculosCapacidad[v][field] = (isNaN(n) || n < 0) ? null : n;
+  clearTimeout(_h1CapSaveTimer);
+  _h1CapSaveTimer = setTimeout(guardar, 800);
 }
 
 function h1SetVehicle(v) {
