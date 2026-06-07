@@ -2574,7 +2574,7 @@ body.sb-collapsed .sidebar:not(:hover) .sidebar-footer-btns { flex-direction: co
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, onAuthStateChanged, signOut, createUserWithEmailAndPassword, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, deleteDoc, onSnapshot, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 const app = initializeApp({apiKey:"AIzaSyD-GEKYRRLQvqX588H0YMMypRz1kKz2rQM",authDomain:"cuentasguias-viarg.firebaseapp.com",projectId:"cuentasguias-viarg",storageBucket:"cuentasguias-viarg.firebasestorage.app",messagingSenderId:"1020802203780",appId:"1:1020802203780:web:d5a95818c43e71835602d1"});
 const db = getFirestore(app), DOC = doc(db,'app','liquidaciones');
 window._dbGet = async()=>{const s=await getDoc(DOC);return s.exists()?s.data():null;};
@@ -2597,7 +2597,7 @@ const TF_SERVICIOS_COL = collection(db,'tarifas_servicios');
 window._tfGetConfig = async()=>{const s=await getDoc(TF_CONFIG_DOC);return s.exists()?s.data():null;};
 window._tfSetConfig = async(d)=>{await setDoc(TF_CONFIG_DOC,d);};
 window._tfGetServicios = async()=>{const snap=await getDocs(TF_SERVICIOS_COL);return snap.docs.map(d=>({id:d.id,...d.data()}));};
-window._tfSetServicio = async(id,d)=>{await setDoc(doc(db,'tarifas_servicios',id),d);};
+window._tfSetServicio = async(id,d)=>{ const ref=doc(db,'tarifas_servicios',id); if(d===null||d===undefined){await deleteDoc(ref);}else{await setDoc(ref,d);} };
 window.dispatchEvent(new Event('firebase-ready'));
 </script>
 <script>

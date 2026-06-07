@@ -37,9 +37,18 @@ async function tfFbSetServicio(id, data) {
   try {
     const c = localStorage.getItem(TF_SERVICIOS_LS);
     const arr = c ? JSON.parse(c) : [];
-    const i = arr.findIndex(s => s.id === id);
-    const obj = { ...data, id };
-    if (i >= 0) arr[i] = obj; else arr.push(obj);
-    localStorage.setItem(TF_SERVICIOS_LS, JSON.stringify(arr));
+    if (data === null || data === undefined) {
+      // Eliminar del localStorage
+      localStorage.setItem(TF_SERVICIOS_LS, JSON.stringify(arr.filter(s => s.id !== id)));
+    } else {
+      const i = arr.findIndex(s => s.id === id);
+      const obj = { ...data, id };
+      if (i >= 0) arr[i] = obj; else arr.push(obj);
+      localStorage.setItem(TF_SERVICIOS_LS, JSON.stringify(arr));
+    }
   } catch(e) {}
+}
+
+async function tfFbDeleteServicio(id) {
+  return tfFbSetServicio(id, null);
 }

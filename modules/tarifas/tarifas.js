@@ -1306,19 +1306,17 @@ async function tfDeleteServicio(id) {
   const s = tfState.servicios.find(x => x.id === id);
   if (!s) return;
   if (!confirm(`¿Eliminar "${s.nombre}"?\nEsta acción no se puede deshacer.`)) return;
+  // Remove from memory
   tfState.servicios = tfState.servicios.filter(x => x.id !== id);
+  if (tfState.activeServicioId === id) tfState.activeServicioId = tfState.servicios[0]?.id || null;
+  // Remove from order config
   if (tfState.config?.serviciosOrder)
     tfState.config.serviciosOrder = tfState.config.serviciosOrder.filter(x => x !== id);
+  // Persist: delete from Firebase + localStorage (tfFbSetServicio handles both when data=null)
+  try { await tfFbSetServicio(id, null); } catch(e) {}
+  // Update order config in Firebase
   tfFbSetConfig(tfState.config || {}).catch(() => {});
-  // Delete from Firebase (set to null — works for RTDB and most wrappers)
-  try { if (window._tfSetServicio) await window._tfSetServicio(id, null); } catch(e) {}
-  // Update localStorage
-  try {
-    const arr = JSON.parse(localStorage.getItem('viarg_tf_servicios') || '[]');
-    localStorage.setItem('viarg_tf_servicios', JSON.stringify(arr.filter(x => x.id !== id)));
-  } catch(e) {}
   if (typeof mostrarToast === 'function') mostrarToast(`"${s.nombre}" eliminada`);
-  if (tfState.activeServicioId === id) tfState.activeServicioId = tfState.servicios[0]?.id || null;
   tfRender();
 }
 
