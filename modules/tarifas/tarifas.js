@@ -182,7 +182,7 @@ function tfRenderTarifasTab(tc) {
 
   return `<div style="display:grid;grid-template-columns:190px 1fr;gap:12px;align-items:start">
     ${tfRenderServiceSidebar(servicios)}
-    <div>
+    <div style="min-width:0">
       ${tfRenderVehiculoTabs(servicio)}
       ${tfRenderTableSection(servicio, tc)}
     </div>
