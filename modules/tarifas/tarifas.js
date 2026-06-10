@@ -157,6 +157,13 @@ function tfRenderTCBar(tc) {
         <input type="number" class="tf-tc-input" value="${tc.real||270}" oninput="tfOnTcEdit('real',this.value)" onblur="tfSaveTc()">
       </div>
     </div>
+    <div class="tf-tc-card">
+      <div class="tf-tc-label">Oficial Compra ${src}</div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:14px;color:var(--text3);font-family:'JetBrains Mono',monospace;font-weight:700">$</span>
+        <input type="number" class="tf-tc-input" value="${tc.oficial_compra||1100}" oninput="tfOnTcEdit('oficial_compra',this.value)" onblur="tfSaveTc()">
+      </div>
+    </div>
     <div class="tf-tc-card" style="display:flex;align-items:center;justify-content:center;min-width:auto;flex:0 0 auto">
       <button id="tf-blue-refresh" onclick="tfFetchAllRates()" style="padding:8px 14px;border-radius:8px;background:rgba(43,188,204,0.12);color:var(--teal);border:1px solid rgba(43,188,204,0.3);font-size:12px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;display:flex;align-items:center;gap:6px;white-space:nowrap">
         <span id="tf-blue-refresh-icon">&#8635;</span> Actualizar
@@ -258,16 +265,23 @@ function tfSelectVehiculo(v) {
 }
 
 // ─── TICKET HELPER ─────────────────────────────────────────────────────────
-// ticketEnabled (bool) controls ON/OFF; ticketARS stores the price.
-// Falls back to ticketARS>0 for legacy data that lacks ticketEnabled.
-function tfEffectiveTicket(svc) {
-  const en = svc.ticketEnabled === true ||
-             (svc.ticketEnabled === undefined && +svc.ticketARS > 0);
-  return en ? (+svc.ticketARS || 0) : 0;
-}
+// ticketEnabled (bool) controls ON/OFF; ticketMoneda ('ARS'|'USD') selects currency.
+// ticketARS stores ARS price, ticketUSD stores USD price, ticketTc picks the rate.
+// Legacy data without ticketMoneda is treated as ARS (backward compat).
 function tfIsTicketEnabled(svc) {
-  return svc.ticketEnabled === true ||
-         (svc.ticketEnabled === undefined && +svc.ticketARS > 0);
+  if (svc.ticketEnabled === true) return true;
+  if (svc.ticketEnabled !== undefined) return false;
+  // Legacy auto-detect from price value
+  return svc.ticketMoneda === 'USD' ? +svc.ticketUSD > 0 : +svc.ticketARS > 0;
+}
+function tfEffectiveTicket(svc) {
+  if (!tfIsTicketEnabled(svc)) return 0;
+  if (svc.ticketMoneda === 'USD') {
+    const tc = (tfState.config && tfState.config.tipoCambio) || {};
+    const rate = +tc[svc.ticketTc || 'blue_compra'] || +tc.blue_compra || 1;
+    return Math.round((+svc.ticketUSD || 0) * rate);
+  }
+  return +svc.ticketARS || 0;
 }
 
 // ─── TABLE SECTION ─────────────────────────────────────────────────────────
@@ -722,6 +736,15 @@ async function tfFetchAllRates() {
     }
   } catch(e) {}
 
+  try {
+    const r = await fetch('https://dolarapi.com/v1/dolares/oficial');
+    if (r.ok) {
+      const d = await r.json();
+      const oficial = d.compra || d.venta;
+      if (oficial) { tfState.config.tipoCambio.oficial_compra = oficial; anySuccess = true; }
+    }
+  } catch(e) {}
+
   if (anySuccess) {
     tfState.config.tipoCambio.fuente = 'live';
     tfState.config.tipoCambio.actualizadoEn = new Date().toISOString();
@@ -1027,27 +1050,60 @@ function tfRenderConfigTab() {
   });
 
   // Sección 2: ticket por persona — siempre visible, acento azul cuando activo
+  const _tc = (tfState.config && tfState.config.tipoCambio) || {};
+  const _tcNames = { blue_compra: 'Blue', mep: 'MEP', oficial_compra: 'Oficial' };
   const ticketRows = servicios.map(s => {
     const hasTicket = tfIsTicketEnabled(s);
-    const ticketFmt = +s.ticketARS > 0 ? Math.round(+s.ticketARS).toLocaleString('es-AR') : '';
-    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;
+    const isUSD = s.ticketMoneda === 'USD';
+    const tcKey = s.ticketTc || 'blue_compra';
+    const rawVal = isUSD ? (+s.ticketUSD || 0) : Math.round(+s.ticketARS || 0);
+    const fmtVal = isUSD ? (rawVal || '') : (rawVal > 0 ? rawVal.toLocaleString('es-AR') : '');
+    const brd = hasTicket ? 'rgba(43,188,204,0.4)' : 'var(--border)';
+    const inpStyle = `font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;padding:4px 6px;border:1px solid ${brd};border-radius:6px;background:var(--surface);color:var(--text);outline:none;text-align:right`;
+
+    const monedaToggle = `<div style="display:inline-flex;border:1px solid var(--border);border-radius:5px;overflow:hidden;flex-shrink:0">
+      <button onclick="tfSetTicketMoneda('${s.id}','ARS')" style="padding:2px 7px;border:none;background:${!isUSD?'var(--teal)':'transparent'};color:${!isUSD?'#060F1E':'var(--text3)'};font-size:10px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif">ARS</button>
+      <button onclick="tfSetTicketMoneda('${s.id}','USD')" style="padding:2px 7px;border:none;background:${isUSD?'var(--teal)':'transparent'};color:${isUSD?'#060F1E':'var(--text3)'};font-size:10px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif">USD</button>
+    </div>`;
+
+    const priceInput = isUSD
+      ? `<input type="number" min="0" step="0.5" value="${rawVal||''}" placeholder="0"
+          oninput="tfSetTicketFromConfig('${s.id}',this.value)"
+          onchange="tfSaveTicketConfig('${s.id}')"
+          style="width:62px;${inpStyle}">`
+      : `<input type="text" value="${fmtVal}" placeholder="0"
+          data-raw="${rawVal}"
+          onfocus="this.value=this.dataset.raw"
+          onblur="this.value=parseInt(this.dataset.raw||0)?parseInt(this.dataset.raw).toLocaleString('es-AR'):''"
+          oninput="this.dataset.raw=this.value.replace(/\\./g,'');tfSetTicketFromConfig('${s.id}',this.dataset.raw)"
+          onchange="tfSaveTicketConfig('${s.id}')"
+          style="width:88px;${inpStyle}">`;
+
+    const tcSelect = isUSD
+      ? `<select onchange="tfSetTicketTc('${s.id}',this.value)"
+          style="font-size:10px;padding:3px 5px;border:1px solid ${brd};border-radius:5px;background:var(--surface);color:var(--text);font-family:'Outfit',sans-serif;cursor:pointer;flex-shrink:0">
+          ${['blue_compra','mep','oficial_compra'].map(k=>`<option value="${k}"${tcKey===k?' selected':''}>${_tcNames[k]}</option>`).join('')}
+        </select>`
+      : '';
+
+    const arsEquiv = isUSD && rawVal > 0
+      ? `<span style="font-size:9px;color:var(--text3);white-space:nowrap;flex-shrink:0">≈ ${Math.round(rawVal*(+_tc[tcKey]||1)).toLocaleString('es-AR')} $</span>`
+      : '';
+
+    return `<div style="display:flex;align-items:center;gap:8px;padding:9px 12px;
       background:${hasTicket?'rgba(43,188,204,0.13)':'var(--surface2)'};
       border:1px solid ${hasTicket?'rgba(43,188,204,0.45)':'var(--border)'};
       border-left:4px solid ${hasTicket?'var(--teal)':'transparent'};
       border-radius:8px;margin-bottom:5px;transition:background .2s,border-color .2s">
       <input type="checkbox" ${hasTicket?'checked':''} onchange="tfToggleTicket('${s.id}',this.checked)"
-        style="width:16px;height:16px;accent-color:var(--teal);cursor:pointer;flex-shrink:0">
-      <span style="font-size:13px;font-weight:600;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:none">${s.nombre}</span>
-      <div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
-        <span style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace">$</span>
-        <input type="text" value="${ticketFmt}" placeholder="0"
-          data-raw="${s.ticketARS||0}"
-          onfocus="this.value=this.dataset.raw"
-          onblur="this.value=parseInt(this.dataset.raw||0)?parseInt(this.dataset.raw).toLocaleString('es-AR'):''"
-          oninput="this.dataset.raw=this.value.replace(/\\./g,'');tfSetTicketFromConfig('${s.id}',this.dataset.raw)"
-          onchange="tfSaveTicketConfig('${s.id}')"
-          style="width:96px;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;padding:4px 8px;border:1px solid ${hasTicket?'rgba(43,188,204,0.4)':'var(--border)'};border-radius:6px;background:var(--surface);color:var(--text);outline:none">
-        <span style="font-size:10px;color:var(--text3);white-space:nowrap">ARS/pax</span>
+        style="width:15px;height:15px;accent-color:var(--teal);cursor:pointer;flex-shrink:0">
+      <span style="font-size:12px;font-weight:600;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.nombre}</span>
+      <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">
+        ${monedaToggle}
+        ${priceInput}
+        <span style="font-size:10px;color:var(--text3);white-space:nowrap">${isUSD?'USD':'ARS'}/pax</span>
+        ${tcSelect}
+        ${arsEquiv}
       </div>
     </div>`;
   }).join('');
@@ -1082,7 +1138,8 @@ function tfToggleTicket(id, checked) {
 function tfSetTicketFromConfig(id, value) {
   const s = tfState.servicios.find(x => x.id === id);
   if (!s) return;
-  s.ticketARS = parseFloat(String(value).replace(/\./g, '').replace(',', '.')) || 0;
+  const v = parseFloat(String(value).replace(/\./g, '').replace(',', '.')) || 0;
+  if (s.ticketMoneda === 'USD') { s.ticketUSD = v; } else { s.ticketARS = v; }
 }
 
 function tfSaveTicketConfig(id) {
@@ -1093,6 +1150,22 @@ function tfSaveTicketConfig(id) {
     const { id: sid, ...data } = s;
     try { await tfFbSetServicio(sid, data); } catch(e) {}
   }, 600);
+}
+
+function tfSetTicketMoneda(id, moneda) {
+  const s = tfState.servicios.find(x => x.id === id);
+  if (!s) return;
+  s.ticketMoneda = moneda;
+  tfSaveTicketConfig(id);
+  tfRender();
+}
+
+function tfSetTicketTc(id, tcKey) {
+  const s = tfState.servicios.find(x => x.id === id);
+  if (!s) return;
+  s.ticketTc = tcKey;
+  tfSaveTicketConfig(id);
+  tfRender();
 }
 
 // ─── DRAG & DROP ───────────────────────────────────────────────────────────
