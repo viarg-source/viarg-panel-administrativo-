@@ -2104,6 +2104,10 @@ body.sb-collapsed .sidebar:not(:hover) .sidebar-footer-btns { flex-direction: co
             <option value="carga_desc">Más reciente primero</option>
             <option value="carga_asc">Más antiguo primero</option>
           </select>
+          <button onclick="ventasAbrirExportModal()" style="padding:5px 13px;border-radius:7px;background:rgba(43,188,204,0.12);color:var(--teal);border:1px solid rgba(43,188,204,0.3);font-size:11.5px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;display:flex;align-items:center;gap:5px;white-space:nowrap">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            Exportar
+          </button>
         </div>
       </div>
       <div class="fin-panel-body" style="padding:0;overflow-x:auto">
@@ -4752,6 +4756,185 @@ function ventasRenderHistorial() {
       <td class="td-actions">${actions}</td>
     </tr>`;
   }).join('');
+}
+
+// ─── EXPORT HISTORIAL ──────────────────────────────────────────────────────
+
+let _ventasExpTipo = 'mes';
+
+function ventasAbrirExportModal() {
+  if (typeof XLSX === 'undefined') { mostrarToast('XLSX no disponible'); return; }
+  let modal = document.getElementById('ventas-export-modal');
+  if (!modal) { modal = document.createElement('div'); modal.id = 'ventas-export-modal'; document.body.appendChild(modal); }
+
+  const curY = new Date().getFullYear();
+  const yearOpts = [curY, curY-1, curY-2].map(y => `<option value="${y}">${y}</option>`).join('');
+  const monthOpts = VENTAS_MONTHS.map((m,i) => `<option value="${i}">${m}</option>`).join('');
+
+  const tipBtn = (t, label) => `<button id="vexp-btn-${t}" onclick="ventasExportSetTipo('${t}')"
+    style="flex:1;padding:8px 4px;border-radius:8px;border:1px solid var(--border);
+      background:${t==='mes'?'var(--teal)':'var(--surface2)'};color:${t==='mes'?'#060F1E':'var(--text2)'};
+      font-size:11px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif">${label}</button>`;
+
+  modal.innerHTML = `<div onclick="if(event.target===this)ventasCerrarExportModal()"
+    style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(3px)">
+    <div onclick="event.stopPropagation()"
+      style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;width:100%;max-width:460px;box-shadow:0 16px 48px rgba(0,0,0,0.3);font-family:'Outfit',sans-serif">
+      <div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:18px">📊 Exportar historial de ventas</div>
+      <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Período</div>
+      <div style="display:flex;gap:6px;margin-bottom:18px">
+        ${tipBtn('mes','Este mes')} ${tipBtn('rango','Rango')} ${tipBtn('anual','Año completo')}
+      </div>
+      <div id="vexp-mes" style="font-size:11.5px;color:var(--text3)">
+        Se exportará: <strong style="color:var(--text)">${VENTAS_MONTHS[ventasState.month]} ${ventasState.year}</strong>
+      </div>
+      <div id="vexp-rango" style="display:none">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Desde</div>
+            <div style="display:flex;gap:5px">
+              <select id="vexp-desde-mes" style="flex:1;padding:7px 6px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);color:var(--text);font-size:12px;font-family:'Outfit',sans-serif">${monthOpts}</select>
+              <select id="vexp-desde-anio" style="width:68px;padding:7px 5px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);color:var(--text);font-size:12px;font-family:'Outfit',sans-serif">${yearOpts}</select>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Hasta</div>
+            <div style="display:flex;gap:5px">
+              <select id="vexp-hasta-mes" style="flex:1;padding:7px 6px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);color:var(--text);font-size:12px;font-family:'Outfit',sans-serif">${monthOpts}</select>
+              <select id="vexp-hasta-anio" style="width:68px;padding:7px 5px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);color:var(--text);font-size:12px;font-family:'Outfit',sans-serif">${yearOpts}</select>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="vexp-anual" style="display:none;align-items:center;gap:10px">
+        <span style="font-size:11.5px;color:var(--text3)">Año:</span>
+        <select id="vexp-anio-sel" style="padding:7px 12px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);color:var(--text);font-size:13px;font-weight:700;font-family:'Outfit',sans-serif">${yearOpts}</select>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:22px">
+        <button onclick="ventasDoExport()" style="flex:2;padding:11px;border-radius:8px;background:var(--teal);color:#060F1E;border:none;font-size:13px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;display:flex;align-items:center;justify-content:center;gap:7px">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+          Exportar XLSX
+        </button>
+        <button onclick="ventasCerrarExportModal()" style="flex:1;padding:11px;border-radius:8px;background:transparent;color:var(--text3);border:1px solid var(--border);font-size:13px;cursor:pointer;font-family:'Outfit',sans-serif">
+          Cancelar
+        </button>
+      </div>
+    </div>
+  </div>`;
+
+  // Default desde/hasta = mes actual
+  const dm = document.getElementById('vexp-desde-mes'); if(dm) dm.value = ventasState.month;
+  const da = document.getElementById('vexp-desde-anio'); if(da) da.value = ventasState.year;
+  const hm = document.getElementById('vexp-hasta-mes'); if(hm) hm.value = ventasState.month;
+  const ha = document.getElementById('vexp-hasta-anio'); if(ha) ha.value = ventasState.year;
+  _ventasExpTipo = 'mes';
+}
+
+function ventasExportSetTipo(tipo) {
+  _ventasExpTipo = tipo;
+  ['mes','rango','anual'].forEach(t => {
+    const btn = document.getElementById('vexp-btn-'+t);
+    const panel = document.getElementById('vexp-'+t);
+    if (btn) { btn.style.background = t===tipo?'var(--teal)':'var(--surface2)'; btn.style.color = t===tipo?'#060F1E':'var(--text2)'; }
+    if (panel) { panel.style.display = t===tipo ? (t==='anual'?'flex':'') : 'none'; }
+  });
+}
+
+function ventasCerrarExportModal() {
+  const m = document.getElementById('ventas-export-modal');
+  if (m) m.innerHTML = '';
+}
+
+function ventasDoExport() {
+  if (typeof XLSX === 'undefined') { mostrarToast('XLSX no disponible'); return; }
+  const v = state.ventas || {};
+  const vendMap = {}; (v.vendedores||[]).forEach(vd => { vendMap[vd.id] = vd.nombre; });
+  const svcMap = {};  (v.servicios||[]).forEach(s  => { svcMap[s.id]  = s.nombre;  });
+  const fmt2 = n => parseFloat((+n).toFixed(2));
+
+  // Build list of month keys in the requested range
+  let keys = [];
+  if (_ventasExpTipo === 'mes') {
+    keys = [ventasMonthKey()];
+  } else if (_ventasExpTipo === 'anual') {
+    const anio = parseInt(document.getElementById('vexp-anio-sel')?.value || new Date().getFullYear());
+    for (let m = 0; m < 12; m++) keys.push(`${anio}-${String(m+1).padStart(2,'0')}`);
+  } else {
+    const desdeM = parseInt(document.getElementById('vexp-desde-mes')?.value||0);
+    const desdeA = parseInt(document.getElementById('vexp-desde-anio')?.value||new Date().getFullYear());
+    const hastaM = parseInt(document.getElementById('vexp-hasta-mes')?.value||0);
+    const hastaA = parseInt(document.getElementById('vexp-hasta-anio')?.value||new Date().getFullYear());
+    let cur = new Date(desdeA, desdeM, 1);
+    const end = new Date(hastaA, hastaM, 1);
+    while (cur <= end) {
+      keys.push(`${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`);
+      cur.setMonth(cur.getMonth()+1);
+    }
+    if (!keys.length) { mostrarToast('Rango inválido: "Desde" debe ser anterior a "Hasta"'); return; }
+  }
+
+  const allVentas = (v.ventas||[]).filter(s => keys.includes(s.mes));
+  if (!allVentas.length) { mostrarToast('Sin ventas en el período seleccionado'); return; }
+
+  const wb = XLSX.utils.book_new();
+  const mesLabel = k => { const [y,m]=k.split('-'); return VENTAS_MONTHS[parseInt(m)-1]+' '+y; };
+
+  // ── Hoja 1: Detalle ──────────────────────────────────────────────────────
+  const detH = ['Mes','Fecha','Vendedor','Cliente','Servicio','Pax','Comisión USD','Tipo'];
+  const detR = allVentas
+    .slice().sort((a,b)=>a.mes.localeCompare(b.mes)||a.fecha.localeCompare(b.fecha))
+    .map(s => {
+      const [y,m,d] = s.fecha.split('-');
+      const esDesc = s.tipo==='descuento'||s.comisionUSD<0;
+      return [mesLabel(s.mes), `${d}/${m}/${y}`, vendMap[s.vendedorId]||'?', s.cliente||'',
+              s.servicioNombre||svcMap[s.servicioId]||'—', s.pax||'', fmt2(s.comisionUSD), esDesc?'Descuento':'Venta'];
+    });
+  const ws1 = XLSX.utils.aoa_to_sheet([detH,...detR]);
+  ws1['!cols'] = [{wch:14},{wch:10},{wch:18},{wch:20},{wch:26},{wch:5},{wch:13},{wch:10}];
+  XLSX.utils.book_append_sheet(wb, ws1, 'Detalle');
+
+  // ── Hoja 2: Por servicio ─────────────────────────────────────────────────
+  const bySvc = {};
+  allVentas.forEach(s => {
+    if (s.tipo==='descuento'||s.comisionUSD<0) return;
+    const nom = s.servicioNombre||svcMap[s.servicioId]||'—';
+    if (!bySvc[nom]) bySvc[nom] = { tours:0, pax:0, com:0 };
+    bySvc[nom].tours++; bySvc[nom].pax += s.pax||0; bySvc[nom].com += +s.comisionUSD||0;
+  });
+  const svcH = ['Servicio','Cant. tours','Total pax','Comisión USD'];
+  const svcR = Object.entries(bySvc).sort((a,b)=>b[1].tours-a[1].tours)
+    .map(([n,d])=>[n, d.tours, d.pax, fmt2(d.com)]);
+  const totSvc = svcR.reduce((a,r)=>['TOTAL',a[1]+r[1],a[2]+r[2],fmt2(a[3]+r[3])],['TOTAL',0,0,0]);
+  const ws2 = XLSX.utils.aoa_to_sheet([svcH,...svcR,[],totSvc]);
+  ws2['!cols'] = [{wch:28},{wch:12},{wch:10},{wch:14}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Por servicio');
+
+  // ── Hoja 3: Por mes (solo si hay más de 1 mes) ───────────────────────────
+  if (keys.length > 1) {
+    const byMes = {};
+    keys.forEach(k => { byMes[k] = { tours:0, pax:0, com:0, desc:0 }; });
+    allVentas.forEach(s => {
+      if (!byMes[s.mes]) return;
+      if (s.tipo==='descuento'||s.comisionUSD<0) { byMes[s.mes].desc += Math.abs(+s.comisionUSD||0); }
+      else { byMes[s.mes].tours++; byMes[s.mes].pax += s.pax||0; byMes[s.mes].com += +s.comisionUSD||0; }
+    });
+    const mesH = ['Mes','Cant. tours','Total pax','Comisión USD','Descuentos USD'];
+    const mesR = keys.map(k => [mesLabel(k), byMes[k].tours, byMes[k].pax, fmt2(byMes[k].com), fmt2(byMes[k].desc)]);
+    const totMes = mesR.reduce((a,r)=>['TOTAL',a[1]+r[1],a[2]+r[2],fmt2(a[3]+r[3]),fmt2(a[4]+r[4])],['TOTAL',0,0,0,0]);
+    const ws3 = XLSX.utils.aoa_to_sheet([mesH,...mesR,[],totMes]);
+    ws3['!cols'] = [{wch:16},{wch:12},{wch:10},{wch:14},{wch:14}];
+    XLSX.utils.book_append_sheet(wb, ws3, 'Por mes');
+  }
+
+  // Filename
+  let label = _ventasExpTipo==='mes'
+    ? `${VENTAS_MONTHS[ventasState.month]}_${ventasState.year}`
+    : _ventasExpTipo==='anual'
+      ? `Anual_${document.getElementById('vexp-anio-sel')?.value}`
+      : `${keys[0]}_a_${keys[keys.length-1]}`;
+  XLSX.writeFile(wb, `VIARG_Ventas_${label}.xlsx`);
+  mostrarToast('Historial exportado', 'ok');
+  ventasCerrarExportModal();
 }
 
 function ventasEditVenta(id) {
